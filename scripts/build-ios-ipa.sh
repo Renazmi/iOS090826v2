@@ -11,6 +11,12 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+export LANG="${LANG:-en_US.UTF-8}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+
+echo "==> Disable Swift Package Manager (CocoaPods + Firebase)"
+flutter config --no-enable-swift-package-manager
+
 echo "==> Flutter pub get"
 flutter pub get
 

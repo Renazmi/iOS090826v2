@@ -50,5 +50,7 @@ class DefaultFirebaseOptions {
     projectId: 'trackit-fac8a',
     storageBucket: 'trackit-fac8a.firebasestorage.app',
     iosBundleId: 'com.trackit.trackitMobile',
+    iosClientId:
+        '323396504255-q0i0kqrrqhrgndei9202e5f673688ssr.apps.googleusercontent.com',
   );
 }
