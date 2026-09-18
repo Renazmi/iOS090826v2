@@ -41,7 +41,7 @@ class TrackitDashboardScaffold extends StatelessWidget {
             tooltip: 'Logout',
             onPressed: () => confirmLogoutAndExit(
               context,
-              onLogout: () => context.read<AppState>().auth.logout(),
+              app: context.read<AppState>(),
             ),
             icon: const Icon(Icons.logout_rounded, color: Colors.white),
           ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/app_theme.dart';
 import '../../services/app_state.dart';
@@ -11,13 +12,15 @@ import '../../services/student_registration_verification_service.dart';
 import '../../utils/profile_photo_picker.dart';
 import '../../utils/settings_validation.dart';
 import '../../utils/trackit_responsive.dart';
+import '../../config/auth_legal_content.dart';
 import '../../widgets/auth/auth_legal_footer.dart';
 import '../../widgets/auth/login_auth_field.dart';
+import '../../widgets/auth/registration_privacy_notice.dart';
 import '../../widgets/auth/registration_selfie_capture_screen.dart';
 import '../../widgets/auth/splash_login_background.dart';
 import '../../widgets/auth/trackit_diamond_logo.dart';
 
-enum _RegisterStep { enterId, confirmId, accountDetails, verifyGmail, profilePhoto }
+enum _RegisterStep { privacyNotice, enterId, confirmId, accountDetails, verifyGmail, profilePhoto }
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
@@ -34,7 +37,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _registrationVerification = StudentRegistrationVerificationService();
 
-  _RegisterStep _step = _RegisterStep.enterId;
+  _RegisterStep _step = _RegisterStep.privacyNotice;
   final _studentIdController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -55,6 +58,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _verificationMessage;
   String _resolvedStudentName = '';
   String? _profilePhotoPreview;
+  bool _privacyAcknowledged = false;
 
   @override
   void initState() {
@@ -63,7 +67,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (initialCode != null && initialCode.isNotEmpty) {
       _pendingVerificationCode = initialCode;
       _verificationMessage =
-          'Gmail verification link opened. Complete the steps below, then tap "I verified in Gmail".';
+          'Gmail confirmation opened. Return here and tap Continue.';
     }
   }
 
@@ -86,12 +90,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _loading = true;
     });
 
+    if (!_privacyAcknowledged) {
+      setState(() {
+        _loading = false;
+        _formError = AuthLegalContent.privacyNoticeRequired;
+        _step = _RegisterStep.privacyNotice;
+      });
+      return;
+    }
+
     final studentId = app.studentAuth.normalizeStudentId(_studentIdController.text);
     final idError = SettingsValidation.validateRegistrationStudentId(studentId);
     if (idError != null) {
       setState(() {
         _loading = false;
         _lookupError = idError;
+        _step = _RegisterStep.enterId;
+      });
+      return;
+    }
+
+    final registrationBlock = app.studentAuth.getStudentRegistrationBlock(studentId);
+    if (registrationBlock != null) {
+      setState(() {
+        _loading = false;
+        _resolvedStudentName = '';
+        _lookupError = registrationBlock;
         _step = _RegisterStep.enterId;
       });
       return;
@@ -153,6 +177,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
+  void _continuePrivacyNotice() {
+    if (!_privacyAcknowledged) {
+      setState(() => _formError = AuthLegalContent.privacyNoticeRequired);
+      return;
+    }
+    setState(() {
+      _formError = null;
+      if (_resolvedStudentName.isNotEmpty) {
+        _step = _RegisterStep.accountDetails;
+        _fullNameController.text = _resolvedStudentName;
+      } else {
+        _step = _RegisterStep.enterId;
+      }
+    });
+  }
+
   void _cancelConfirmation() {
     setState(() {
       _step = _RegisterStep.enterId;
@@ -184,6 +224,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (!_privacyAcknowledged) {
+      setState(() {
+        _loading = false;
+        _formError = AuthLegalContent.privacyNoticeRequired;
+        _step = _RegisterStep.privacyNotice;
+      });
+      return;
+    }
+
+    final app = context.read<AppState>();
+    final studentId = app.studentAuth.normalizeStudentId(_studentIdController.text);
+    final registrationBlock = app.studentAuth.getStudentRegistrationBlock(studentId);
+    if (registrationBlock != null) {
+      setState(() {
+        _loading = false;
+        _formError = registrationBlock;
+      });
+      return;
+    }
+    if (app.studentAuth.hasRegisteredAccount(studentId)) {
+      setState(() {
+        _loading = false;
+        _formError =
+            'This Student ID already has a TrackIT account. Please log in instead.';
+      });
+      return;
+    }
+
     final password = _passwordController.text;
     final confirmPassword = _confirmPasswordController.text;
     if (password != confirmPassword) {
@@ -194,8 +262,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    final enrolledName = _resolvedStudentName.trim();
     final validationError = SettingsValidation.validateStudentRegistration(
-      fullName: _fullNameController.text.trim(),
+      fullName: enrolledName.isNotEmpty ? enrolledName : _fullNameController.text.trim(),
       gmail: _gmailController.text.trim(),
       phone: _phoneController.text.trim(),
       password: password,
@@ -212,6 +281,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final sent = await _registrationVerification.sendGmailVerification(
       email: _gmailController.text.trim(),
       password: password,
+      isGmailBoundToAccount: (email) => _isGmailBoundToAccount(app, email),
     );
 
     if (!mounted) return;
@@ -229,7 +299,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _step = _RegisterStep.verifyGmail;
       _gmailVerified = false;
       _verificationMessage =
-          'Open Gmail, tap the Google verification link, then return here and tap "I verified in Gmail".';
+          'Open Gmail and confirm the email from Google (check Spam if you do not see it), then tap Continue.';
     });
   }
 
@@ -239,10 +309,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _formError = null;
     });
 
+    final app = context.read<AppState>();
     final result = await _registrationVerification.confirmGmailVerified(
       email: _gmailController.text.trim(),
       password: _passwordController.text,
       oobCode: _pendingVerificationCode,
+      isGmailBoundToAccount: (email) => _isGmailBoundToAccount(app, email),
     );
 
     if (!mounted) return;
@@ -261,7 +333,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _pendingVerificationCode = null;
       _step = _RegisterStep.profilePhoto;
       _verificationMessage =
-          'Gmail verified. Upload a photo or take a selfie to finish registration.';
+          'Gmail verified. Take a selfie to finish registration.';
     });
   }
 
@@ -271,9 +343,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _formError = null;
     });
 
+    final app = context.read<AppState>();
     final sent = await _registrationVerification.sendGmailVerification(
       email: _gmailController.text.trim(),
       password: _passwordController.text,
+      isGmailBoundToAccount: (email) => _isGmailBoundToAccount(app, email),
     );
 
     if (!mounted) return;
@@ -286,8 +360,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
       _verificationMessage =
           'Verification email resent to ${_maskGmail(_gmailController.text.trim())}. '
-          'Open Gmail, tap Verify, then return and tap "I verified in Gmail".';
+          'Open Gmail (check Spam), confirm it, then tap Continue.';
     });
+  }
+
+  bool _isGmailBoundToAccount(AppState app, String email) {
+    final student = app.studentAuth.findStudentByGmail(email);
+    if (student != null && student.studentId.trim().isNotEmpty) {
+      return true;
+    }
+    final officer = app.officerAuth.findOfficerByEmail(email);
+    return officer != null && (officer.studentId ?? '').trim().isNotEmpty;
+  }
+
+  Future<void> _openGmail() async {
+    final uri = Uri.parse('https://mail.google.com');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _formError = 'Could not open Gmail. Open it yourself, check Spam, then return here.';
+      });
+    }
   }
 
   Future<void> _pickFacePhoto({required bool fromCamera}) async {
@@ -335,7 +430,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (!_privacyAcknowledged) {
+      setState(() {
+        _loading = false;
+        _formError = AuthLegalContent.privacyNoticeRequired;
+      });
+      return;
+    }
+
     final studentId = app.studentAuth.normalizeStudentId(_studentIdController.text);
+    final registrationBlock = app.studentAuth.getStudentRegistrationBlock(studentId);
+    if (registrationBlock != null) {
+      setState(() {
+        _loading = false;
+        _formError = registrationBlock;
+      });
+      return;
+    }
+
     if (app.studentAuth.hasRegisteredAccount(studentId)) {
       setState(() {
         _loading = false;
@@ -354,25 +466,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    if (_fullNameController.text.trim().toLowerCase() != enrolled.name.trim().toLowerCase()) {
-      setState(() {
-        _loading = false;
-        _formError = 'Full name must match the name on file for this Student ID.';
-      });
-      return;
-    }
-
     if (_profilePhotoPreview == null) {
       setState(() {
         _loading = false;
-        _photoError = 'Add a photo of your face. Selfies or front-camera photos work best.';
+        _photoError =
+            'Add a clear photo of your own face. Take a selfie or upload a picture — not anime, group photos, or drawings.';
       });
       return;
     }
 
     final result = await app.studentAuth.createStudentAccount(
       studentId: studentId,
-      fullName: _fullNameController.text.trim(),
+      fullName: enrolled.name.trim(),
       phone: _phoneController.text.trim(),
       gmail: _gmailController.text.trim(),
       password: _passwordController.text,
@@ -487,7 +592,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Enter your Student ID to begin registration.',
+                              _step == _RegisterStep.privacyNotice
+                                  ? 'Read the Data Privacy Notice before you enter your Student ID.'
+                                  : 'Enter your Student ID to begin registration.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.62),
@@ -499,6 +606,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                       SizedBox(height: layout.isShortHeight ? 22 : 28),
+                      if (_step == _RegisterStep.privacyNotice) ...[
+                        RegistrationPrivacyNotice(
+                          dark: true,
+                          onAcknowledgedChanged: (value) {
+                            setState(() {
+                              _privacyAcknowledged = value;
+                              if (value) _formError = null;
+                            });
+                          },
+                        ),
+                        if (_formError != null) ...[
+                          const SizedBox(height: 12),
+                          _FieldError(message: _formError!),
+                        ],
+                        const SizedBox(height: 16),
+                        _PrimaryButton(
+                          label: 'Continue to Student ID',
+                          height: buttonHeight,
+                          loading: false,
+                          enabled: _privacyAcknowledged,
+                          onPressed: _continuePrivacyNotice,
+                        ),
+                      ],
                       if (_step == _RegisterStep.enterId) ...[
                         LoginAuthField(
                           label: 'Student ID',
@@ -651,7 +781,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (_step == _RegisterStep.verifyGmail) ...[
                         Text(
                           'A verification email was sent to ${_maskGmail(_gmailController.text.trim())}. '
-                          'Open Gmail, tap the Google verification link, then return here and tap the button below.',
+                          'Open Gmail and confirm it (check Spam or Promotions if you do not see it). '
+                          'Then return here and tap Continue. You do not need to copy anything from the email.',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.75),
                             height: 1.45,
@@ -674,8 +805,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           _FieldError(message: _formError!),
                         ],
                         SizedBox(height: layout.isShortHeight ? 20 : 28),
+                        _OutlineButton(
+                          label: 'Open Gmail',
+                          height: buttonHeight,
+                          onPressed: _loading ? () {} : _openGmail,
+                        ),
+                        const SizedBox(height: 10),
                         _PrimaryButton(
-                          label: 'I verified in Gmail',
+                          label: _loading ? 'Checking...' : 'Continue',
                           height: buttonHeight,
                           loading: _loading,
                           onPressed: _confirmGmailVerifiedInApp,
@@ -691,13 +828,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ],
                       if (_step == _RegisterStep.profilePhoto) ...[
                         Text(
-                          'Add a clear photo of your face. Take a selfie with the in-app camera (front or back) or upload from your gallery.',
+                          'Take a selfie or upload a photo of your own face.',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.75),
                             height: 1.45,
                             fontSize: 14,
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        _FacePhotoWarning(),
                         if (_verificationMessage != null) ...[
                           const SizedBox(height: 12),
                           Text(
@@ -737,7 +876,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: 16),
                         _PrimaryButton(
-                          label: 'Take selfie',
+                          label: _profilePhotoPreview == null ? 'Take selfie' : 'Retake selfie',
                           height: buttonHeight,
                           loading: false,
                           onPressed: _loading ? () {} : () => _pickFacePhoto(fromCamera: true),
@@ -746,13 +885,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _OutlineButton(
                           label: _profilePhotoPreview == null
                               ? 'Upload photo'
-                              : 'Choose a different photo',
+                              : 'Upload a different photo',
                           height: buttonHeight,
                           onPressed: _loading ? () {} : () => _pickFacePhoto(fromCamera: false),
                         ),
                         if (_photoError != null) ...[
                           const SizedBox(height: 12),
                           _FieldError(message: _photoError!),
+                        ],
+                        if (!_privacyAcknowledged) ...[
+                          const SizedBox(height: 16),
+                          RegistrationPrivacyNotice(
+                            dark: true,
+                            onAcknowledgedChanged: (value) {
+                              setState(() {
+                                _privacyAcknowledged = value;
+                                if (value) _formError = null;
+                              });
+                            },
+                          ),
                         ],
                         if (_formError != null) ...[
                           const SizedBox(height: 12),
@@ -767,6 +918,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           label: 'Create Student Account',
                           height: buttonHeight,
                           loading: _loading,
+                          enabled: _privacyAcknowledged &&
+                              _profilePhotoPreview != null &&
+                              _gmailVerified,
                           onPressed: () => _submitRegistration(app),
                         ),
                       ],
@@ -829,11 +983,13 @@ class _PrimaryButton extends StatelessWidget {
     required this.height,
     required this.loading,
     required this.onPressed,
+    this.enabled = true,
   });
 
   final String label;
   final double height;
   final bool loading;
+  final bool enabled;
   final VoidCallback onPressed;
 
   @override
@@ -841,7 +997,7 @@ class _PrimaryButton extends StatelessWidget {
     return SizedBox(
       height: height,
       child: ElevatedButton(
-        onPressed: loading ? null : onPressed,
+        onPressed: (loading || !enabled) ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.loginRed,
           foregroundColor: Colors.white,
@@ -863,6 +1019,48 @@ class _PrimaryButton extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _FacePhotoWarning extends StatelessWidget {
+  const _FacePhotoWarning();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.loginRed.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.loginRed.withValues(alpha: 0.5)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Warning: your face must be clearly visible',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 13.5,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            '• Use a photo of yourself only — one person, looking at the camera.\n'
+            '• Do not use anime, cartoons, drawings, avatars, or heavily filtered images.\n'
+            '• Do not use group photos, logos, memes, or pictures of other people.\n'
+            '• Your whole face should be unobstructed (no full-face mask or heavy blur).',
+            style: TextStyle(
+              color: Color(0xF0FFFFFF),
+              fontSize: 12.5,
+              height: 1.45,
+            ),
+          ),
+        ],
       ),
     );
   }

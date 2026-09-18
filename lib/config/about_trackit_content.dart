@@ -8,7 +8,7 @@ abstract final class AboutTrackitContent {
 
   static const overview =
       'TrackIT is a web-based student organization management system built for campus operations. '
-      'It centralizes officer records, event planning, attendance tracking, student accounts, voting, '
+      'It centralizes officer records, event planning, attendance tracking, student accounts, '
       'reports, and administrative oversight in one secure workspace.';
 
   static const purpose =
@@ -51,11 +51,6 @@ abstract final class AboutTrackitContent {
       description: 'Register and manage admin, officer, and student login credentials in one place.',
     ),
     AboutFeature(
-      icon: Icons.how_to_vote_outlined,
-      title: 'Voting',
-      description: 'Create elections, manage ballots, and record student organization voting activity.',
-    ),
-    AboutFeature(
       icon: Icons.description_outlined,
       title: 'Reports',
       description: 'Collect and review officer submissions such as minutes and accomplishment reports.',
@@ -84,7 +79,7 @@ abstract final class AboutTrackitContent {
     ),
     AboutAudience(
       label: 'Students',
-      description: 'Registered students who sign in for attendance, voting, and other organization activities.',
+      description: 'Registered students who sign in for attendance and other organization activities.',
     ),
   ];
 

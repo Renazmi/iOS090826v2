@@ -13,6 +13,7 @@ import '../models/student_account.dart';
 import '../services/events_service.dart';
 import '../services/firestore_sync_service.dart';
 import '../services/storage_service.dart';
+import '../utils/attendance_punctuality.dart';
 import '../utils/event_qr_code.dart';
 import '../utils/event_time_windows.dart';
 import '../utils/student_id.dart';
@@ -35,6 +36,7 @@ class OfficerAttendanceRecord {
     this.timedOutAt,
     this.imageUrl,
     this.timedOutImageUrl,
+    this.punctualityStatus,
     this.liveCheckIn,
   });
 
@@ -46,6 +48,9 @@ class OfficerAttendanceRecord {
   int? timedOutAt;
   String? imageUrl;
   String? timedOutImageUrl;
+
+  /// Present or Late, stamped from the time-in window end. Never editable by hand.
+  final PunctualityStatus? punctualityStatus;
   final bool? liveCheckIn;
 
   Map<String, dynamic> toJson() => {
@@ -57,6 +62,8 @@ class OfficerAttendanceRecord {
         if (timedOutAt != null) 'timedOutAt': timedOutAt,
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (timedOutImageUrl != null) 'timedOutImageUrl': timedOutImageUrl,
+        if (punctualityStatus != null)
+          'punctualityStatus': punctualityToJson(punctualityStatus!),
         if (liveCheckIn != null) 'liveCheckIn': liveCheckIn,
       };
 
@@ -70,6 +77,7 @@ class OfficerAttendanceRecord {
       timedOutAt: json['timedOutAt'] as int?,
       imageUrl: json['imageUrl'] as String?,
       timedOutImageUrl: json['timedOutImageUrl'] as String?,
+      punctualityStatus: parseStoredPunctuality(json['punctualityStatus']),
       liveCheckIn: json['liveCheckIn'] as bool?,
     );
   }
@@ -85,6 +93,7 @@ class AttendeeAttendanceRecord {
     this.timedOutAt,
     this.imageUrl,
     this.timedOutImageUrl,
+    this.punctualityStatus,
   });
 
   final int eventId;
@@ -96,6 +105,9 @@ class AttendeeAttendanceRecord {
   String? imageUrl;
   String? timedOutImageUrl;
 
+  /// Present or Late, stamped from the time-in window end. Never editable by hand.
+  final PunctualityStatus? punctualityStatus;
+
   Map<String, dynamic> toJson() => {
         'eventId': eventId,
         'section': section,
@@ -105,6 +117,8 @@ class AttendeeAttendanceRecord {
         if (timedOutAt != null) 'timedOutAt': timedOutAt,
         if (imageUrl != null) 'imageUrl': imageUrl,
         if (timedOutImageUrl != null) 'timedOutImageUrl': timedOutImageUrl,
+        if (punctualityStatus != null)
+          'punctualityStatus': punctualityToJson(punctualityStatus!),
       };
 
   static AttendeeAttendanceRecord fromJson(Map<String, dynamic> json) {
@@ -117,6 +131,7 @@ class AttendeeAttendanceRecord {
       timedOutAt: json['timedOutAt'] as int?,
       imageUrl: json['imageUrl'] as String?,
       timedOutImageUrl: json['timedOutImageUrl'] as String?,
+      punctualityStatus: parseStoredPunctuality(json['punctualityStatus']),
     );
   }
 }
@@ -153,12 +168,7 @@ class AttendanceService {
 
   bool canTimeInNow(EventItem event) {
     if (event.cancelled || _events.effectiveStatus(event) != EventStatus.current) return false;
-    return EventTimeWindows.isWithinConfiguredWindow(
-      event.whenDate,
-      event.timeInWindowStart,
-      event.timeInWindowEnd,
-      endDate: event.timeInWindowEndDate,
-    );
+    return EventTimeWindows.isTimeInOpen(event.whenDate, event.timeInWindowStart);
   }
 
   bool canTimeOutNow(EventItem event) {
@@ -171,13 +181,16 @@ class AttendanceService {
     );
   }
 
-  String? getTimeInWindowMessage(EventItem event) => EventTimeWindows.getConfiguredWindowBlockMessage(
-        event.whenDate,
-        event.timeInWindowStart,
-        event.timeInWindowEnd,
-        'time in',
-        endDate: event.timeInWindowEndDate,
-      );
+  String? getTimeInWindowMessage(EventItem event) =>
+      EventTimeWindows.getTimeInOpensMessage(event.whenDate, event.timeInWindowStart);
+
+  /// Present when the time in landed at or before the time-in window end,
+  /// Late afterwards. Derived from the stored stamp so it cannot be edited.
+  PunctualityStatus punctualityStatusFor(EventItem event, int timedInAt) =>
+      resolvePunctualityStatus(event, timedInAt);
+
+  String punctualityLabelFor(PunctualityStatus? status) =>
+      punctualityLabel(status ?? PunctualityStatus.present);
 
   String? getTimeOutWindowMessage(EventItem event) => EventTimeWindows.getConfiguredWindowBlockMessage(
         event.whenDate,
@@ -629,13 +642,7 @@ class AttendanceService {
     return null;
   }
 
-  AttendanceResult? _validateOfficerAssignment(EventItem event, Officer officer) {
-    if (!event.assignAll && !event.assignedOfficerIds.contains(officer.id)) {
-      return const AttendanceResult.fail('You are not assigned to this event.');
-    }
-    return null;
-  }
-
+  /// Time-in is stored independently of event assignment. Unassigned officers may still time in.
   Future<AttendanceResult> recordOfficerTimeIn(
     EventItem event,
     Officer officer, {
@@ -645,8 +652,6 @@ class AttendanceService {
   }) async {
     final blocked = _validateEvent(event);
     if (blocked != null) return blocked;
-    final assignment = _validateOfficerAssignment(event, officer);
-    if (assignment != null) return assignment;
     final selfie = validateSelfie(selfieDataUrl);
     if (selfie != null) return selfie;
     final geofence = _validateGeofence(event, latitude, longitude);
@@ -656,18 +661,21 @@ class AttendanceService {
     if (getOfficerRecord(event.id, officer.id) != null) {
       return const AttendanceResult.fail('You already timed in for this event.');
     }
+    final timedInAt = DateTime.now().millisecondsSinceEpoch;
+    final status = resolvePunctualityStatus(event, timedInAt);
     final record = OfficerAttendanceRecord(
       eventId: event.id,
       officerId: officer.id,
       officerName: officer.name,
       section: officer.section,
-      timedInAt: DateTime.now().millisecondsSinceEpoch,
+      timedInAt: timedInAt,
       imageUrl: selfieDataUrl,
+      punctualityStatus: status,
       liveCheckIn: true,
     );
     try {
       await _saveOfficerRecord(record);
-      return const AttendanceResult.ok();
+      return AttendanceResult.ok('Timed in — ${punctualityLabel(status)}.');
     } catch (error) {
       return AttendanceResult.fail(
         error is Exception ? error.toString().replaceFirst('Exception: ', '') : 'Could not save attendance.',
@@ -706,6 +714,7 @@ class AttendanceService {
       timedOutAt: DateTime.now().millisecondsSinceEpoch,
       imageUrl: record.imageUrl,
       timedOutImageUrl: selfieDataUrl,
+      punctualityStatus: record.punctualityStatus,
       liveCheckIn: record.liveCheckIn ?? true,
     );
     try {
@@ -737,17 +746,20 @@ class AttendanceService {
     if (getStudentRecord(event.id, student.studentId) != null) {
       return const AttendanceResult.fail('You already timed in for this event.');
     }
+    final timedInAt = DateTime.now().millisecondsSinceEpoch;
+    final status = resolvePunctualityStatus(event, timedInAt);
     final record = AttendeeAttendanceRecord(
       eventId: event.id,
       section: (section != null && section.trim().isNotEmpty) ? section.trim() : '—',
       name: student.fullName,
       studentId: _normalizeStudentId(student.studentId),
-      timedInAt: DateTime.now().millisecondsSinceEpoch,
+      timedInAt: timedInAt,
       imageUrl: selfieDataUrl,
+      punctualityStatus: status,
     );
     try {
       await _saveAttendeeRecord(record);
-      return const AttendanceResult.ok();
+      return AttendanceResult.ok('Timed in — ${punctualityLabel(status)}.');
     } catch (error) {
       return AttendanceResult.fail(
         error is Exception ? error.toString().replaceFirst('Exception: ', '') : 'Could not save attendance.',
@@ -786,6 +798,7 @@ class AttendanceService {
       timedOutAt: DateTime.now().millisecondsSinceEpoch,
       imageUrl: record.imageUrl,
       timedOutImageUrl: selfieDataUrl,
+      punctualityStatus: record.punctualityStatus,
     );
     try {
       await _saveAttendeeRecord(updated);

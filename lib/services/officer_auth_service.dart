@@ -9,6 +9,7 @@ import '../data/seed_data.dart';
 import '../models/officer.dart';
 import '../utils/firebase_password_sync.dart';
 import '../utils/password_hash.dart';
+import '../config/auth_constants.dart';
 import '../utils/settings_validation.dart';
 import 'api_service.dart';
 import 'firestore_sync_service.dart';
@@ -39,7 +40,7 @@ class OfficerAuthService {
     await _loadPasswords();
     await _ensureSeededPasswords();
     await _ensurePrimaryLoginAccounts();
-    await _ensureClassRosterOfficersUnassigned();
+    await _pruneEliteToCoreOfficers();
     await _startFirestoreListener();
   }
 
@@ -144,35 +145,13 @@ class OfficerAuthService {
       final seed = seedById[login.officerId];
       final index = _officers.indexWhere((o) => o.id == login.officerId);
 
-      if (seed != null) {
-        if (index < 0) {
-          _officers.add(seed.copyWith(email: login.email));
-          officersChanged = true;
-        } else {
-          final current = _officers[index];
-          final legacyRenazPhoto = current.profilePictureUrl?.trim();
-          final needsRenazPhotoUpdate = login.officerId == 1 &&
-              (legacyRenazPhoto == 'assets/images/lance1.jpg' ||
-                  legacyRenazPhoto == 'assets/images/muichiro.jpg');
-          if (current.email.trim().toLowerCase() != login.email.trim().toLowerCase() ||
-              current.position.trim().toLowerCase() != seed.position.trim().toLowerCase() ||
-              current.organizationId != seed.organizationId ||
-              current.name.trim().isEmpty ||
-              needsRenazPhotoUpdate) {
-            _officers[index] = seed.copyWith(
-              email: login.email,
-              phone: current.phone ?? seed.phone,
-              profilePictureUrl: needsRenazPhotoUpdate
-                  ? 'assets/images/bangate.jpg'
-                  : current.profilePictureUrl ?? seed.profilePictureUrl,
-            );
-            officersChanged = true;
-          }
-        }
-      } else if (index >= 0) {
-        final officer = _officers[index];
-        if (officer.email.trim().toLowerCase() != login.email.trim().toLowerCase()) {
-          _officers[index] = officer.copyWith(email: login.email);
+      if (seed != null && index < 0) {
+        _officers.add(seed.copyWith(email: login.email));
+        officersChanged = true;
+      } else if (seed != null && index >= 0) {
+        final current = _officers[index];
+        if (current.email.trim().isEmpty) {
+          _officers[index] = current.copyWith(email: login.email);
           officersChanged = true;
         }
       }
@@ -192,8 +171,7 @@ class OfficerAuthService {
         officersChanged = true;
       } else if (seed != null && index >= 0) {
         final current = _officers[index];
-        if (current.email.trim().toLowerCase() != login.email.trim().toLowerCase() ||
-            current.name.trim().isEmpty) {
+        if (current.email.trim().isEmpty) {
           _officers[index] = seed.copyWith(email: login.email);
           officersChanged = true;
         }
@@ -209,13 +187,14 @@ class OfficerAuthService {
     if (passwordsChanged) await _savePasswords();
   }
 
-  Future<void> _ensureClassRosterOfficersUnassigned() async {
+  Future<void> _pruneEliteToCoreOfficers() async {
+    const coreEliteOfficerIds = {1, 2, 3, 4, 9, 10};
     var changed = false;
     for (var i = 0; i < _officers.length; i++) {
       final officer = _officers[i];
-      if (!classRosterOfficerIds.contains(officer.id)) continue;
-      if (officer.organizationId == classRosterOrganizationId) continue;
-      _officers[i] = officer.copyWith(organizationId: classRosterOrganizationId);
+      if (officer.organizationId != eliteOrganizationId) continue;
+      if (coreEliteOfficerIds.contains(officer.id)) continue;
+      _officers[i] = officer.copyWith(organizationId: 0);
       changed = true;
     }
     if (changed) await _saveOfficers();
@@ -227,6 +206,41 @@ class OfficerAuthService {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> refreshOfficerFromServer(String email) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty) return;
+    try {
+      await FirestoreSyncService.instance.initialize();
+      if (!FirestoreSyncService.instance.isReady) return;
+      final snap = await FirestoreSyncService.instance.db
+          .collection(FirestoreCollections.officers)
+        .where('email', isEqualTo: normalized)
+        .get(const GetOptions(source: Source.server));
+      if (snap.docs.isEmpty) return;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final rawId = data['id'] ?? doc.id;
+        final officer = Officer.fromJson({
+          ...data,
+          'id': rawId is num ? rawId : int.tryParse('$rawId') ?? 0,
+        });
+        final index = _officers.indexWhere((o) => o.id == officer.id);
+        if (index >= 0) {
+          _officers[index] = officer;
+        } else {
+          _officers.add(officer);
+        }
+        final hash = data['passwordHash'];
+        if (hash is String && hash.isNotEmpty) {
+          _passwords[officer.id] = hash;
+        }
+      }
+      await _saveOfficers();
+      await _savePasswords();
+      await _ensurePrimaryLoginAccounts();
+    } catch (_) {}
   }
 
   Officer? verifyOfficerLogin(String email, String password) {
@@ -265,12 +279,42 @@ class OfficerAuthService {
   }
 
   Future<Officer?> acceptRemotePasswordIfValid(String email, String password) async {
+    return completeOfficerPasswordLogin(email, password);
+  }
+
+  Future<Officer?> completeOfficerPasswordLogin(String email, String password) async {
+    await refreshOfficerFromServer(email);
     final officer = findOfficerByEmail(email);
     if (officer == null) return null;
-    final accepted = await tryFirebasePasswordSignIn(officer.email, password);
-    if (!accepted) return null;
-    await resetOfficerPasswordFromRecovery(officer.id, password);
-    return getOfficerById(officer.id);
+    final stored = _passwords[officer.id];
+    final storedOk = stored != null && verifyPassword(password, stored);
+
+    final probe = await probeFirebasePasswordSignIn(officer.email, password);
+    if (probe == FirebasePasswordProbe.accepted) {
+      if (!storedOk) {
+        await resetOfficerPasswordFromRecovery(officer.id, password);
+      }
+      await markOfficerFirebaseAuthLinked(officer.id);
+      return getOfficerById(officer.id) ?? officer;
+    }
+    if (!storedOk) return null;
+    final resolved = await resolveStoredPasswordAfterAuthProbe(
+      email: officer.email,
+      password: password,
+      probe: probe,
+      authLinked: officer.firebaseAuthLinked,
+    );
+    if (!resolved.allow) return null;
+    if (resolved.markLinked) await markOfficerFirebaseAuthLinked(officer.id);
+    return getOfficerById(officer.id) ?? officer;
+  }
+
+  Future<void> markOfficerFirebaseAuthLinked(int officerId) async {
+    final index = _officers.indexWhere((item) => item.id == officerId);
+    if (index < 0 || _officers[index].firebaseAuthLinked) return;
+    _officers[index] = _officers[index].copyWith(firebaseAuthLinked: true);
+    await _saveOfficers();
+    await _writeOfficerToFirestore(_officers[index]);
   }
 
   Officer? getCurrentOfficer() {
@@ -318,6 +362,13 @@ class OfficerAuthService {
     }
 
     if (trimmedEmail != null) {
+      final currentEmail = _officers[index].email.trim().toLowerCase();
+      if (trimmedEmail != currentEmail &&
+          !AuthConstants.memberLoginIdentifierChangeEnabled) {
+        return const OfficerUpdateResult.fail(
+          AuthConstants.memberLoginIdentifierLockedMessage,
+        );
+      }
       final duplicate = _officers.any(
         (o) => o.id != id && o.email.toLowerCase() == trimmedEmail,
       );
@@ -335,7 +386,12 @@ class OfficerAuthService {
 
     _officers[index] = updated;
     await _saveOfficers();
-    await _writeOfficerToFirestore(updated);
+    final written = await _writeOfficerToFirestore(updated);
+    if (!written) {
+      return const OfficerUpdateResult.fail(
+        'Could not save the login email to the account server. Try again.',
+      );
+    }
     return const OfficerUpdateResult.ok();
   }
 
@@ -365,12 +421,23 @@ class OfficerAuthService {
 
     _passwords[id] = hashPassword(newPassword);
     await _savePasswords();
-    await _writeOfficerToFirestore(officer);
-    await syncFirebaseAccountPassword(
+    final written = await _writeOfficerToFirestore(officer);
+    if (!written && FirestoreSyncService.instance.isReady) {
+      return const OfficerUpdateResult.fail(
+        'Could not save the new password to the account server. Try again.',
+      );
+    }
+    final synced = await syncFirebaseAccountPassword(
       email: officer.email,
       currentPassword: currentPassword,
       newPassword: newPassword,
     );
+    if (!synced) {
+      return const OfficerUpdateResult.fail(
+        'Could not save the new password to the account server. Try again.',
+      );
+    }
+    await markOfficerFirebaseAuthLinked(id);
     return const OfficerUpdateResult.ok();
   }
 
@@ -431,13 +498,15 @@ class OfficerAuthService {
       } finally {
         _applyingFirestoreSnapshot = false;
       }
+      await _ensurePrimaryLoginAccounts();
+      await _pruneEliteToCoreOfficers();
     });
   }
 
-  Future<void> _writeOfficerToFirestore(Officer officer) async {
-    if (_applyingFirestoreSnapshot) return;
+  Future<bool> _writeOfficerToFirestore(Officer officer) async {
+    if (_applyingFirestoreSnapshot) return false;
     await FirestoreSyncService.instance.initialize();
-    if (!FirestoreSyncService.instance.isReady) return;
+    if (!FirestoreSyncService.instance.isReady) return false;
     try {
       await FirestoreSyncService.instance.db
           .collection(FirestoreCollections.officers)
@@ -447,7 +516,10 @@ class OfficerAuthService {
         if (_passwords[officer.id] != null) 'passwordHash': _passwords[officer.id],
         'updatedAt': DateTime.now().toIso8601String(),
       });
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 }
 

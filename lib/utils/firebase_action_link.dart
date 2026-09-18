@@ -9,7 +9,7 @@ const trackitAndroidPackageName = 'com.trackit.trackit_mobile';
 const trackitFirebaseAuthDomain = 'trackit-fac8a.firebaseapp.com';
 
 /// Production web app — Firebase password-reset continue URL (authorized domain).
-const trackitWebAppOrigin = 'https://trackitv1beta.netlify.app';
+const trackitWebAppOrigin = 'https://trackit-ccs.com';
 
 /// From `REVERSED_CLIENT_ID` in ios/Runner/GoogleService-Info.plist.
 const trackitFirebaseIosUrlScheme =
@@ -31,7 +31,7 @@ ActionCodeSettings trackitFirebaseActionCodeSettings({String continuePath = '/re
 /// Password reset — opens TrackIT on iOS/Android when installed, otherwise the web app.
 ActionCodeSettings trackitFirebasePasswordResetSettings() {
   return ActionCodeSettings(
-    url: '$trackitWebAppOrigin/',
+    url: '$trackitWebAppOrigin/reset-password',
     handleCodeInApp: true,
     androidPackageName: trackitAndroidPackageName,
     androidInstallApp: false,
@@ -41,7 +41,7 @@ ActionCodeSettings trackitFirebasePasswordResetSettings() {
 }
 
 Uri trackitPasswordResetWebUri(String oobCode) {
-  return Uri.parse(trackitWebAppOrigin).replace(
+  return Uri.parse('$trackitWebAppOrigin/reset-password').replace(
     queryParameters: {
       'mode': 'resetPassword',
       'oobCode': oobCode,

@@ -238,7 +238,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     AuthResult result;
     if (loginId.contains('@')) {
       result = await app.auth.loginStudent(loginId, password);
-      if (!result.isSuccess && !result.needsProfileCompletion) {
+      // A deactivated student must not fall through to the officer login.
+      if (!result.isSuccess && !result.needsProfileCompletion && !result.deactivated) {
         result = await app.auth.loginOfficer(loginId, password);
       }
     } else {
@@ -286,13 +287,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   Future<void> _openForgotPassword(AppState app, {String initialOobCode = ''}) async {
     final loginId = _loginIdController.text.trim();
     final initialGmail = loginId.contains('@') ? loginId : '';
-    final initialStudentId = loginId.contains('@') ? '' : loginId;
 
     final resetLoginId = await showForgotPasswordDialog(
       context,
       accountRecovery: app.accountRecovery,
       initialGmail: initialGmail,
-      initialStudentId: initialStudentId,
+      initialStudentId: '',
       initialOobCode: initialOobCode,
     );
 

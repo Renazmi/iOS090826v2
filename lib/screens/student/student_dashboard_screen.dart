@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../../models/event_item.dart';
 import '../../services/app_state.dart';
+import '../../widgets/common/trackit_decorations.dart';
 import '../../widgets/common/trackit_event_tile.dart';
 import '../../widgets/common/trackit_page_layout.dart';
 import '../../widgets/common/trackit_scaffold.dart';
@@ -61,6 +62,20 @@ class StudentDashboardScreen extends StatelessWidget {
               ),
             ],
           ),
+          TrackitSurfaceCard(
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.description_outlined, color: AppTheme.red),
+              title: const Text(
+                'Organizations & by-laws',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: const Text('View constitutions for ELITE, Obra, and ASP'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.go('/student/organizations'),
+            ),
+          ),
+          const SizedBox(height: 8),
           _eventGroup(context, 'Ongoing', data.ongoingEvents, 'Ongoing', AppTheme.green),
           _eventGroup(context, 'Upcoming', data.upcomingEvents, 'Upcoming', AppTheme.blue),
         ],

@@ -10,6 +10,7 @@ import '../../utils/profile_photo_picker.dart';
 import '../../widgets/common/trackit_decorations.dart';
 import '../../widgets/common/trackit_page_layout.dart';
 import '../../widgets/common/trackit_scaffold.dart';
+import '../../widgets/org/org_bylaws_sheet.dart';
 
 const _positionOrder = [
   'President',
@@ -78,7 +79,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
 
     return TrackitPageLayout(
       title: 'Organizations',
-      subtitle: 'Browse orgs and view their members.',
+      subtitle: 'Browse orgs, members, and by-laws.',
       heroTrailing: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
@@ -92,7 +93,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Select an organization',
+            'ELITE, Obra, and ASP',
             style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 15,
@@ -101,7 +102,7 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Tap ELITE, Obra, or ASP to view members.',
+            'Open By-Laws on a card, or tap the org to view members.',
             style: TextStyle(color: colors.textSecondary, height: 1.4),
           ),
           const SizedBox(height: 14),
@@ -113,20 +114,20 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
               ),
             )
           else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: orgs.map((org) {
-                final memberCount = _officersForOrg(app, org.id).length;
-                final selected = _selectedOrgId == org.id;
-                return _OrgPickerChip(
+            ...orgs.map((org) {
+              final memberCount = _officersForOrg(app, org.id).length;
+              final selected = _selectedOrgId == org.id;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _OrgPickerCard(
                   org: org,
                   memberCount: memberCount,
                   selected: selected,
                   onTap: () => setState(() => _selectedOrgId = org.id),
-                );
-              }).toList(),
-            ),
+                  onBylaws: () => showOrgBylawsSheet(context, org),
+                ),
+              );
+            }),
           const SizedBox(height: 20),
           if (selectedOrg == null)
             TrackitSurfaceCard(
@@ -208,86 +209,125 @@ class _OrganizationsScreenState extends State<OrganizationsScreen> {
   }
 }
 
-class _OrgPickerChip extends StatelessWidget {
-  const _OrgPickerChip({
+class _OrgPickerCard extends StatelessWidget {
+  const _OrgPickerCard({
     required this.org,
     required this.memberCount,
     required this.selected,
     required this.onTap,
+    required this.onBylaws,
   });
 
   final Organization org;
   final int memberCount;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onBylaws;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.trackit;
 
-    return Material(
-      color: selected
-          ? AppTheme.red.withValues(alpha: colors.isDark ? 0.22 : 0.08)
-          : colors.surface,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: onTap,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: selected
+            ? AppTheme.red.withValues(alpha: colors.isDark ? 0.22 : 0.08)
+            : colors.surface,
         borderRadius: BorderRadius.circular(18),
-        child: Container(
-          width: 108,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: selected ? AppTheme.red.withValues(alpha: 0.55) : colors.border,
-            ),
-            boxShadow: selected ? null : colors.softShadow,
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: selected ? AppTheme.headerGradient : null,
-                  color: selected ? null : colors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: colors.border.withValues(alpha: 0.5)),
-                ),
-                alignment: Alignment.center,
-                child: org.logoUrl != null && org.logoUrl!.startsWith('assets/')
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          org.logoUrl!,
-                          width: 52,
-                          height: 52,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _OrgInitial(name: org.name, selected: selected),
-                        ),
-                      )
-                    : _OrgInitial(name: org.name, selected: selected),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                org.name,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: selected ? AppTheme.red : colors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$memberCount member${memberCount == 1 ? '' : 's'}',
-                style: TextStyle(fontSize: 11, color: colors.textMuted),
-              ),
-            ],
-          ),
+        border: Border.all(
+          color: selected ? AppTheme.red.withValues(alpha: 0.55) : colors.border,
         ),
+        boxShadow: selected ? null : colors.softShadow,
+      ),
+      child: Column(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: selected ? AppTheme.headerGradient : null,
+                        color: selected ? null : colors.surfaceMuted,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: colors.border.withValues(alpha: 0.5)),
+                      ),
+                      alignment: Alignment.center,
+                      child: org.logoUrl != null && org.logoUrl!.startsWith('assets/')
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.asset(
+                                org.logoUrl!,
+                                width: 52,
+                                height: 52,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _OrgInitial(name: org.name, selected: selected),
+                              ),
+                            )
+                          : _OrgInitial(name: org.name, selected: selected),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            org.name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: selected ? AppTheme.red : colors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$memberCount member${memberCount == 1 ? '' : 's'}',
+                            style: TextStyle(fontSize: 12, color: colors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Material(
+            color: AppTheme.red,
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(17)),
+            child: InkWell(
+              onTap: onBylaws,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(17)),
+              child: const SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.description_outlined, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'BY-LAWS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

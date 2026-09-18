@@ -1,7 +1,7 @@
 name: trackit_mobile
 description: TrackIT mobile app for students and officers — companion to the Ionic web app.
 publish_to: 'none'
-version: 1.0.1+19
+version: 1.0.1+20
 
 environment:
   sdk: ^3.9.0
@@ -52,3 +52,4 @@ flutter:
   assets:
     - assets/images/
     - assets/tech-icons/
+    - assets/bylaws/

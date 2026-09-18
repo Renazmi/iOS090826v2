@@ -16,6 +16,13 @@ import 'firestore_sync_service.dart';
 import 'sections_service.dart';
 import 'storage_service.dart';
 
+/// Shown when a deactivated student tries to sign in.
+const studentDeactivatedLoginMessage =
+    'This account has been deactivated. Contact your administrator.';
+
+const studentDeactivatedRegisterMessage =
+    'This Student ID has been deactivated. Contact your administrator.';
+
 /// Mirrors `StudentAuthService` from the Ionic web app.
 class StudentAuthService {
   StudentAuthService(this._storage, this._api, this._sections);
@@ -61,6 +68,8 @@ class StudentAuthService {
         gmail: student.gmail,
         password: password,
         verified: student.verified,
+        status: student.status,
+        passwordSetByAdmin: student.passwordSetByAdmin,
         profileCompleted: student.profileCompleted,
         createdAt: student.createdAt,
         profilePictureUrl: student.profilePictureUrl,
@@ -155,6 +164,8 @@ class StudentAuthService {
                 gmail: student.gmail,
                 password: password,
                 verified: student.verified,
+                status: student.status,
+                passwordSetByAdmin: student.passwordSetByAdmin,
                 profileCompleted: student.profileCompleted,
                 createdAt: student.createdAt,
                 profilePictureUrl: student.profilePictureUrl,
@@ -249,11 +260,14 @@ class StudentAuthService {
       return StudentUpdateResult.fail(validationError);
     }
 
+    final registrationBlock = getStudentRegistrationBlock(id);
+    if (registrationBlock != null) {
+      return StudentUpdateResult.fail(registrationBlock);
+    }
+
     final enrolledAny = await _sections.fetchStudentByIdAny(id);
     if (enrolledAny != null && !enrolledAny.isActive) {
-      return const StudentUpdateResult.fail(
-        'This Student ID has been deactivated. Contact your administrator.',
-      );
+      return const StudentUpdateResult.fail(studentDeactivatedRegisterMessage);
     }
     final enrolled = enrolledAny != null && enrolledAny.isActive ? enrolledAny : null;
     if (enrolled == null) {
@@ -281,7 +295,7 @@ class StudentAuthService {
     final list = _readStudents();
     if (list.any((s) => s.gmail.toLowerCase() == trimmedGmail)) {
       return const StudentUpdateResult.fail(
-        'This Gmail is already used by another account.',
+        'This Gmail is already in use. Please use a different Gmail.',
       );
     }
 
@@ -302,28 +316,70 @@ class StudentAuthService {
     return const StudentUpdateResult.ok();
   }
 
-  StudentAccount? verifyStudentLogin(String login, String password) {
-    final raw = login.trim();
-    if (raw.isEmpty || password.isEmpty) return null;
-
-    final StudentAccount? student;
-    if (raw.contains('@')) {
-      student = findStudentByGmail(raw);
-    } else {
-      student = getStudentById(normalizeStudentId(raw));
+  /// Why this Student ID cannot register, or null when self-registration is allowed.
+  String? getStudentRegistrationBlock(String studentId) {
+    final id = normalizeStudentId(studentId);
+    if (id.isEmpty) return 'Student ID is required.';
+    if (!isStudentActive(id)) {
+      return studentDeactivatedRegisterMessage;
     }
-
-    if (student == null || !student.verified || !verifyPassword(password, student.password)) {
-      return null;
+    if (_sections.findStudentById(id) == null) {
+      return 'Student ID not found in the system.';
     }
-    return student;
+    return null;
   }
 
+  /// A student is blocked when their account is deactivated, or when they are
+  /// enrolled on the roster and that roster entry was deactivated.
+  bool isStudentActive(String studentId) {
+    final id = normalizeStudentId(studentId);
+    if (id.isEmpty) return false;
+
+    final account = getStudentById(id);
+    if (account != null && !account.isActive) return false;
+
+    final rosterEntry = _sections.findStudentByIdAny(id);
+    if (rosterEntry != null && !rosterEntry.isActive) return false;
+
+    return true;
+  }
+
+  /// Credentials are checked before the status so a wrong password never reveals
+  /// whether an account exists.
+  StudentLoginResult verifyStudentLoginResult(String login, String password) {
+    const invalid = StudentLoginResult.invalid();
+
+    final raw = login.trim();
+    if (raw.isEmpty || password.isEmpty) return invalid;
+
+    final student = raw.contains('@')
+        ? findStudentByGmail(raw)
+        : getStudentById(normalizeStudentId(raw));
+
+    if (student == null || !student.verified || !verifyPassword(password, student.password)) {
+      return invalid;
+    }
+    if (!isStudentActive(student.studentId)) {
+      return const StudentLoginResult.deactivated();
+    }
+    return StudentLoginResult.ok(student);
+  }
+
+  StudentAccount? verifyStudentLogin(String login, String password) =>
+      verifyStudentLoginResult(login, password).student;
+
+  /// Ends the session when an admin deactivates the student mid-session.
   StudentAccount? getCurrentStudentAccount() {
     final session = _storage.readJsonObject(StorageKeys.currentStudent);
     if (session == null) return null;
     final id = normalizeStudentId('${session['studentId'] ?? ''}');
-    return getStudentById(id);
+    final student = getStudentById(id);
+    if (student == null) return null;
+    if (!isStudentActive(id)) {
+      unawaited(clearCurrentStudent());
+      return null;
+    }
+    return student;
   }
 
   Future<void> setCurrentStudent(StudentAccount student) async {
@@ -388,7 +444,7 @@ class StudentAuthService {
       );
       if (duplicate) {
         return const StudentUpdateResult.fail(
-          'This Gmail is already used by another account.',
+          'This Gmail is already in use. Please use a different Gmail.',
         );
       }
     }
@@ -403,7 +459,11 @@ class StudentAuthService {
           'Password must be at least ${SettingsValidation.minPasswordLength} characters.',
         );
       }
-      updated = updated.copyWith(password: hashPassword(password));
+      // Passwords set here come from the student, so the Firebase fallback applies again.
+      updated = updated.copyWith(
+        password: hashPassword(password),
+        passwordSetByAdmin: false,
+      );
     }
     if (profilePictureUrl != null) {
       final url = profilePictureUrl.trim();
@@ -449,6 +509,42 @@ class StudentAuthService {
     return result;
   }
 
+  Future<void> refreshStudentFromServer(String login) async {
+    final raw = login.trim();
+    if (raw.isEmpty) return;
+    try {
+      if (!FirestoreSyncService.instance.isReady) {
+        await FirestoreSyncService.instance.initialize();
+      }
+      if (!FirestoreSyncService.instance.isReady) return;
+      final col = FirestoreSyncService.instance.db.collection(FirestoreCollections.students);
+      const server = GetOptions(source: Source.server);
+      if (raw.contains('@')) {
+        final snap = await col.where('gmail', isEqualTo: raw.toLowerCase()).get(server);
+        if (snap.docs.isEmpty) return;
+        final student = StudentAccount.fromJson({...snap.docs.first.data(), 'studentId': snap.docs.first.id});
+        await _upsertLocalStudent(student);
+        return;
+      }
+      final id = student_id_util.normalizeStudentId(raw);
+      final doc = await col.doc(id).get(server);
+      if (!doc.exists) return;
+      final student = StudentAccount.fromJson({...doc.data()!, 'studentId': doc.id});
+      await _upsertLocalStudent(student);
+    } catch (_) {}
+  }
+
+  Future<void> _upsertLocalStudent(StudentAccount student) async {
+    final list = _readStudents();
+    final index = list.indexWhere((s) => s.studentId == student.studentId);
+    if (index >= 0) {
+      list[index] = student;
+    } else {
+      list.add(student);
+    }
+    await _writeStudents(list, syncFirestore: false);
+  }
+
   Future<StudentUpdateResult> changeStudentPassword(
     String studentId,
     String currentPassword,
@@ -473,37 +569,95 @@ class StudentAuthService {
     }
 
     final result = await updateStudentAccount(studentId, password: newPassword);
-    if (result.success) {
-      final email = student.gmail.trim().toLowerCase();
-      if (email.isNotEmpty) {
-        await syncFirebaseAccountPassword(
-          email: email,
-          currentPassword: currentPassword,
-          newPassword: newPassword,
+    if (!result.success) return result;
+    if (result.warning != null && FirestoreSyncService.instance.isReady) {
+      return StudentUpdateResult.fail(result.warning!);
+    }
+
+    final email = student.gmail.trim().toLowerCase();
+    if (email.isNotEmpty) {
+      final synced = await syncFirebaseAccountPassword(
+        email: email,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      if (!synced) {
+        return const StudentUpdateResult.fail(
+          'Could not save the new password to the account server. Try again.',
         );
       }
+      await markStudentFirebaseAuthLinked(studentId);
     }
-    return result;
+    return const StudentUpdateResult.ok();
   }
 
   Future<StudentAccount?> acceptRemotePasswordIfValid(String login, String password) async {
+    final result = await completeStudentPasswordLogin(login, password);
+    return result.student;
+  }
+
+  Future<StudentLoginResult> completeStudentPasswordLogin(
+    String login,
+    String password,
+  ) async {
+    const invalid = StudentLoginResult.invalid();
     final raw = login.trim();
-    if (raw.isEmpty || password.isEmpty) return null;
+    if (raw.isEmpty || password.isEmpty) return invalid;
+    await refreshStudentFromServer(raw);
 
     final student = raw.contains('@')
         ? findStudentByGmail(raw)
         : getStudentById(normalizeStudentId(raw));
-    if (student == null || !student.verified) return null;
+    if (student == null || !student.verified) return invalid;
+    if (!isStudentActive(student.studentId)) {
+      return const StudentLoginResult.deactivated();
+    }
+
+    final storedOk = verifyPassword(password, student.password);
+    if (student.passwordSetByAdmin) {
+      return storedOk ? StudentLoginResult.ok(student) : invalid;
+    }
 
     final email = student.gmail.trim().toLowerCase();
-    if (email.isEmpty) return null;
+    if (email.isEmpty) {
+      return storedOk ? StudentLoginResult.ok(student) : invalid;
+    }
 
-    final accepted = await tryFirebasePasswordSignIn(email, password);
-    if (!accepted) return null;
+    final probe = await probeFirebasePasswordSignIn(email, password);
+    if (probe == FirebasePasswordProbe.accepted) {
+      if (!storedOk) {
+        final saved = await updateStudentAccount(student.studentId, password: password);
+        if (!saved.success) return invalid;
+      }
+      await markStudentFirebaseAuthLinked(student.studentId);
+      return StudentLoginResult.ok(getStudentById(student.studentId) ?? student);
+    }
 
-    final result = await updateStudentAccount(student.studentId, password: password);
-    if (!result.success) return null;
-    return getStudentById(student.studentId);
+    if (storedOk) {
+      final resolved = await resolveStoredPasswordAfterAuthProbe(
+        email: email,
+        password: password,
+        probe: probe,
+        authLinked: student.firebaseAuthLinked,
+      );
+      if (!resolved.allow) return invalid;
+      if (resolved.markLinked) {
+        await markStudentFirebaseAuthLinked(student.studentId);
+      }
+      return StudentLoginResult.ok(getStudentById(student.studentId) ?? student);
+    }
+    return invalid;
+  }
+
+  Future<void> markStudentFirebaseAuthLinked(String studentId) async {
+    final id = normalizeStudentId(studentId);
+    final list = _readStudents();
+    final index = list.indexWhere((s) => s.studentId == id);
+    if (index < 0 || list[index].firebaseAuthLinked) return;
+    final updated = list[index].copyWith(firebaseAuthLinked: true);
+    list[index] = updated;
+    await _writeStudents(list, syncFirestore: false);
+    await _writeStudentToFirestore(updated);
   }
 
   StudentAccount? findStudentByGmail(String gmail) {
@@ -523,6 +677,9 @@ class StudentAuthService {
       return const StudentPasswordResetLookup.fail(
         'No TrackIT account found for this Student ID.',
       );
+    }
+    if (!isStudentActive(id)) {
+      return const StudentPasswordResetLookup.fail(studentDeactivatedLoginMessage);
     }
 
     final hasGmail = student.gmail.trim().isNotEmpty;
@@ -554,6 +711,9 @@ class StudentAuthService {
       return const StudentPasswordResetLookup.fail(
         'No TrackIT account found for this Gmail address.',
       );
+    }
+    if (!isStudentActive(student.studentId)) {
+      return const StudentPasswordResetLookup.fail(studentDeactivatedLoginMessage);
     }
 
     final registeredGmail = student.gmail.trim();
@@ -816,6 +976,22 @@ class StudentAuthService {
     final syncError = updated == null ? null : await _writeStudentToFirestore(updated);
     return StudentUpdateResult.ok(warning: syncError);
   }
+}
+
+class StudentLoginResult {
+  const StudentLoginResult._({this.student, this.deactivated = false, this.error});
+
+  const StudentLoginResult.ok(StudentAccount account) : this._(student: account);
+  const StudentLoginResult.invalid()
+      : this._(error: 'Invalid Student ID or password.');
+  const StudentLoginResult.deactivated()
+      : this._(deactivated: true, error: studentDeactivatedLoginMessage);
+
+  final StudentAccount? student;
+  final bool deactivated;
+  final String? error;
+
+  bool get ok => student != null;
 }
 
 class StudentUpdateResult {

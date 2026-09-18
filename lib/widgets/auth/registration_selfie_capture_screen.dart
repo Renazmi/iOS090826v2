@@ -190,7 +190,7 @@ class _RegistrationSelfieCaptureScreenState extends State<RegistrationSelfieCapt
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Position your face in the frame. You can switch between the front and back camera.',
+                'Position your own face in the frame. Your face must be clearly visible — no anime, drawings, group photos, or pictures of other people.',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.75),
                   height: 1.45,

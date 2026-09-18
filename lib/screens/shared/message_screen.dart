@@ -82,7 +82,7 @@ class _MessageScreenState extends State<MessageScreen> {
   Future<void> _send(AppState app) async {
     if (!_canSend) return;
     if (!app.canAccessMessages()) {
-      _showSnack('You must be added to the ELITE group chat before sending messages.');
+      _showSnack('You must be added to the group chat before sending messages.');
       return;
     }
 
@@ -176,7 +176,7 @@ class _MessageScreenState extends State<MessageScreen> {
         padding: EdgeInsets.symmetric(horizontal: layout.pageHorizontalPadding),
         child: Center(
           child: Text(
-            'You are not in the ELITE group chat yet. Ask an admin to add you from the Messages member list.',
+            'You are not in the group chat yet. Ask an admin to add you from the Messages member list.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge,
           ),

@@ -196,11 +196,13 @@ class EventsService {
     if (event.id == attendanceTestEventId) {
       return _resolveAttendanceTestStatus();
     }
-    final today = _todayStr();
-    final dateCmp = event.whenDate.compareTo(today);
-    if (dateCmp > 0) return EventStatus.upcoming;
-    if (dateCmp < 0) return EventStatus.previous;
-    return EventStatus.current;
+    return EventTimeWindows.resolveLiveEventStatus(
+      whenDate: event.whenDate,
+      whenTime: event.whenTime,
+      timeInWindowStart: event.timeInWindowStart,
+      timeOutWindowEnd: event.timeOutWindowEnd,
+      timeOutWindowEndDate: event.timeOutWindowEndDate,
+    );
   }
 
   EventStatus _resolveAttendanceTestStatus() {
@@ -213,11 +215,31 @@ class EventsService {
     return EventStatus.current;
   }
 
+  bool _sameOfficerIds(List<int> left, List<int> right) {
+    if (left.length != right.length) return false;
+    final a = [...left]..sort();
+    final b = [...right]..sort();
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   String _todayStr() {
     final now = DateTime.now();
     final m = now.month.toString().padLeft(2, '0');
     final d = now.day.toString().padLeft(2, '0');
     return '${now.year}-$m-$d';
+  }
+
+  List<int> _attendanceTestAssignedOfficerIds() {
+    const unassigned = {25, 24};
+    const orgOfficers = [
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+      9011, 9012, 9013, 9014, 9015, 9016, 9017, 9018, 9019, 9020,
+    ];
+    final roster = [for (var id = 24; id <= 64; id++) id];
+    return [...orgOfficers, ...roster].where((id) => !unassigned.contains(id)).toList();
   }
 
   EventItem _buildAttendanceTestEvent() {
@@ -230,8 +252,8 @@ class EventsService {
       whenTime: attendanceTestWindowStart,
       where: 'Dominican College of Tarlac (DCT)',
       eventScope: EventScope.school,
-      assignAll: true,
-      assignedOfficerIds: const [],
+      assignAll: false,
+      assignedOfficerIds: _attendanceTestAssignedOfficerIds(),
       officersAttended: 0,
       attendeesScanned: 0,
       officersTimedIn: 0,
@@ -262,6 +284,8 @@ class EventsService {
         existing.status != effectiveStatus ||
         existing.cancelled == true ||
         existing.geofenceEnabled != false ||
+        existing.assignAll != false ||
+        !_sameOfficerIds(existing.assignedOfficerIds, template.assignedOfficerIds) ||
         existing.timeInWindowStart != template.timeInWindowStart ||
         existing.timeInWindowEnd != template.timeInWindowEnd ||
         existing.timeInWindowEndDate != template.timeInWindowEndDate ||

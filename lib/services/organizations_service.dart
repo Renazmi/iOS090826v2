@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../config/firestore_collections.dart';
 import '../config/storage_keys.dart';
+import '../data/org_bylaws_defaults.dart';
 import '../data/seed_data.dart';
 import '../models/organization.dart';
 import 'api_service.dart';
@@ -28,14 +29,17 @@ class OrganizationsService {
   }
 
   Future<void> initialize() async {
+    await OrgBylawsDefaults.ensureLoaded();
     final rows = _storage.readJsonList(StorageKeys.organizations);
     if (rows.isEmpty) {
       _organizations = List.from(defaultOrganizations);
-      await _save();
     } else {
-      _organizations = rows.map(Organization.fromJson).toList();
+      _organizations = rows.map(Organization.fromJson).where((org) => org.id != 0).toList();
     }
+    _organizations = _withDefaultBylaws(_organizations);
+    await _save(notify: false);
     await _startFirestoreListener();
+    _onChanged?.call();
   }
 
   Future<void> dispose() async {
@@ -43,12 +47,12 @@ class OrganizationsService {
     _firestoreSub = null;
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool notify = true}) async {
     await _api.saveCollection(
       StorageKeys.organizations,
       _organizations.map((o) => o.toJson()).toList(),
     );
-    _onChanged?.call();
+    if (notify) _onChanged?.call();
   }
 
   Organization? getById(int id) {
@@ -69,14 +73,48 @@ class OrganizationsService {
         .snapshots()
         .listen((snap) async {
       if (snap.docs.isEmpty) return;
-      _organizations = snap.docs.map((doc) {
-        final data = doc.data();
-        return Organization.fromJson({
-          ...data,
-          'id': data['id'] ?? int.tryParse(doc.id) ?? 0,
-        });
-      }).toList();
+      final remote = <Organization>[];
+      for (final doc in snap.docs) {
+        try {
+          final org = Organization.fromJson(
+            Map<String, dynamic>.from(doc.data()),
+            docId: doc.id,
+          );
+          if (org.id != 0 && org.name.trim().isNotEmpty) remote.add(org);
+        } catch (_) {}
+      }
+      if (remote.isEmpty) return;
+      _organizations = _withDefaultBylaws(_mergeIncoming(remote));
       await _save();
     });
+  }
+
+  List<Organization> _mergeIncoming(List<Organization> remote) {
+    final previous = {for (final org in _organizations) org.id: org};
+    return remote.map((incoming) {
+      final local = previous[incoming.id];
+      if (local == null) return incoming;
+      if (incoming.hasBylaws) return incoming;
+      if (local.hasBylaws) {
+        return incoming.copyWith(
+          bylawsTitle: local.bylawsTitle,
+          bylawsBody: local.bylawsBody,
+          bylawsUpdatedAt: local.bylawsUpdatedAt,
+        );
+      }
+      return incoming;
+    }).toList();
+  }
+
+  List<Organization> _withDefaultBylaws(List<Organization> orgs) {
+    return orgs.map((org) {
+      if (org.hasBylaws) return org;
+      final body = OrgBylawsDefaults.bodyFor(org.name);
+      if (body == null || body.isEmpty) return org;
+      return org.copyWith(
+        bylawsTitle: org.bylawsTitle ?? OrgBylawsDefaults.titleFor(org.name),
+        bylawsBody: body,
+      );
+    }).toList();
   }
 }

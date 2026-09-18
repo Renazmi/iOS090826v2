@@ -1,16 +1,29 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../config/storage_keys.dart';
 import 'firestore_sync_service.dart';
 import '../utils/firebase_action_link.dart';
+
+const gmailAlreadyInUseMessage =
+    'This Gmail is already in use. Please use a different Gmail.';
 
 class StudentRegistrationVerificationService {
   Future<RegistrationSendResult> sendGmailVerification({
     required String email,
     required String password,
+    bool Function(String email)? isGmailBoundToAccount,
   }) async {
     final normalized = email.trim().toLowerCase();
     if (normalized.isEmpty || password.isEmpty) {
       return RegistrationSendResult.fail('Gmail and password are required before verification.');
+    }
+
+    if (isGmailBoundToAccount?.call(normalized) == true) {
+      return const RegistrationSendResult.fail(gmailAlreadyInUseMessage);
     }
 
     try {
@@ -18,40 +31,24 @@ class StudentRegistrationVerificationService {
       final auth = FirebaseAuth.instance;
       await auth.signOut();
 
-      User? user;
-      try {
-        final credential = await auth.createUserWithEmailAndPassword(
-          email: normalized,
-          password: password,
-        );
-        user = credential.user;
-      } on FirebaseAuthException catch (error) {
-        if (error.code != 'email-already-in-use') {
-          return RegistrationSendResult.fail(_mapAuthError(error));
-        }
-
-        try {
-          final existing = await auth.signInWithEmailAndPassword(
-            email: normalized,
-            password: password,
-          );
-          user = existing.user;
-          if (user?.emailVerified == true) {
-            await auth.signOut();
-            return const RegistrationSendResult.ok();
-          }
-        } on FirebaseAuthException catch (signInError) {
-          return RegistrationSendResult.fail(
-            _mapExistingAccountSignInError(signInError),
-          );
-        }
-      }
-
+      final user = await _createOrReuseAuthUser(
+        email: normalized,
+        password: password,
+        isGmailBoundToAccount: isGmailBoundToAccount,
+      );
       if (user == null) {
         return const RegistrationSendResult.fail('Could not prepare Gmail verification.');
       }
 
-      await user.sendEmailVerification(trackitFirebaseActionCodeSettings());
+      if (isGmailBoundToAccount?.call(normalized) == true) {
+        await auth.signOut();
+        return const RegistrationSendResult.fail(gmailAlreadyInUseMessage);
+      }
+
+      await _rememberPendingPassword(normalized, password);
+      if (user.emailVerified != true) {
+        await _sendVerificationEmail(user);
+      }
       await auth.signOut();
       return const RegistrationSendResult.ok();
     } on FirebaseAuthException catch (error) {
@@ -71,7 +68,7 @@ class StudentRegistrationVerificationService {
     final email = expectedEmail.trim().toLowerCase();
     if (oobCode == null) {
       return const RegistrationVerifyResult.fail(
-        'Enter the verification code from your Gmail email, or paste the full verification link.',
+        'Open Gmail and confirm the verification email, then tap Continue.',
       );
     }
     if (email.isEmpty) {
@@ -95,7 +92,7 @@ class StudentRegistrationVerificationService {
     } on FirebaseAuthException catch (error) {
       if (_isConsumedActionCode(error)) {
         return const RegistrationVerifyResult.fail(
-          'This verification link was already used. If you tapped Verify in Gmail, tap "I verified in Gmail" again.',
+          'Gmail was already confirmed. Tap Continue to keep going.',
         );
       }
       return RegistrationVerifyResult.fail(_mapAuthError(error));
@@ -106,54 +103,19 @@ class StudentRegistrationVerificationService {
     }
   }
 
-  /// After the user taps the link in Gmail, confirm verification without pasting the code.
-  Future<RegistrationVerifyResult> verifyGmailBySignIn({
-    required String email,
-    required String password,
-  }) async {
-    final normalized = email.trim().toLowerCase();
-    if (normalized.isEmpty || password.isEmpty) {
-      return const RegistrationVerifyResult.fail('Gmail and password are required.');
-    }
-
-    try {
-      await _ensureFirebaseReady();
-      final auth = FirebaseAuth.instance;
-      await auth.signOut();
-      final credential = await auth.signInWithEmailAndPassword(
-        email: normalized,
-        password: password,
-      );
-      await credential.user?.reload();
-      final user = auth.currentUser;
-      if (user?.emailVerified != true) {
-        await auth.signOut();
-        return const RegistrationVerifyResult.fail(
-          'Gmail is not verified yet. Open the email from Google, tap Verify, then try again.',
-        );
-      }
-      await auth.signOut();
-      return const RegistrationVerifyResult.ok();
-    } on FirebaseAuthException catch (error) {
-      return RegistrationVerifyResult.fail(_mapAuthError(error));
-    } catch (_) {
-      return const RegistrationVerifyResult.fail(
-        'Could not confirm Gmail verification. Check your connection and try again.',
-      );
-    }
-  }
-
-  /// Confirm Gmail verification after the user returns from their inbox.
-  ///
-  /// Sign-in is tried first because the verification link is often already
-  /// consumed when Gmail or the app opens it. A pending link code is only used
-  /// when sign-in reports the address is still unverified.
+  /// After the student confirms in Gmail (including Spam),
+  /// check Firebase marked the address verified — same flow as web.
   Future<RegistrationVerifyResult> confirmGmailVerified({
     required String email,
     required String password,
     String? oobCode,
+    bool Function(String email)? isGmailBoundToAccount,
   }) async {
-    var result = await verifyGmailBySignIn(email: email, password: password);
+    var result = await _confirmByAuthUser(
+      email: email,
+      password: password,
+      isGmailBoundToAccount: isGmailBoundToAccount,
+    );
     if (result.valid) {
       return result;
     }
@@ -168,11 +130,19 @@ class StudentRegistrationVerificationService {
       expectedEmail: email,
     );
     if (linkResult.valid) {
-      return verifyGmailBySignIn(email: email, password: password);
+      return _confirmByAuthUser(
+        email: email,
+        password: password,
+        isGmailBoundToAccount: isGmailBoundToAccount,
+      );
     }
 
     if (_isConsumedActionCodeMessage(linkResult.error)) {
-      final retry = await verifyGmailBySignIn(email: email, password: password);
+      final retry = await _confirmByAuthUser(
+        email: email,
+        password: password,
+        isGmailBoundToAccount: isGmailBoundToAccount,
+      );
       if (retry.valid) {
         return retry;
       }
@@ -185,24 +155,176 @@ class StudentRegistrationVerificationService {
     return result;
   }
 
+  Future<RegistrationVerifyResult> _confirmByAuthUser({
+    required String email,
+    required String password,
+    bool Function(String email)? isGmailBoundToAccount,
+  }) async {
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty || password.isEmpty) {
+      return const RegistrationVerifyResult.fail('Gmail and password are required.');
+    }
+
+    try {
+      await _ensureFirebaseReady();
+      final auth = FirebaseAuth.instance;
+      await auth.signOut();
+      final user = await _createOrReuseAuthUser(
+        email: normalized,
+        password: password,
+        isGmailBoundToAccount: isGmailBoundToAccount,
+      );
+      if (user == null) {
+        return const RegistrationVerifyResult.fail('Could not confirm Gmail verification.');
+      }
+      await user.reload();
+      final verified = auth.currentUser?.emailVerified == true;
+      await auth.signOut();
+      if (!verified) {
+        return const RegistrationVerifyResult.fail(
+          'Gmail is not verified yet. Open Gmail (check Spam or Promotions), confirm the email from Google, then tap Continue.',
+        );
+      }
+      return const RegistrationVerifyResult.ok();
+    } on FirebaseAuthException catch (error) {
+      return RegistrationVerifyResult.fail(_mapAuthError(error));
+    } catch (_) {
+      return const RegistrationVerifyResult.fail(
+        'Could not confirm Gmail verification. Check your connection and try again.',
+      );
+    }
+  }
+
+  Future<User?> _createOrReuseAuthUser({
+    required String email,
+    required String password,
+    bool Function(String email)? isGmailBoundToAccount,
+  }) async {
+    final auth = FirebaseAuth.instance;
+    try {
+      final credential = await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return credential.user;
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'email-already-in-use') {
+        rethrow;
+      }
+    }
+
+    if (isGmailBoundToAccount?.call(email) == true) {
+      throw FirebaseAuthException(code: 'email-already-in-use');
+    }
+
+    if (await _signInWithKnownPassword(email, password)) {
+      final current = auth.currentUser;
+      if (current != null) {
+        try {
+          await current.updatePassword(password);
+        } catch (_) {}
+      }
+      return auth.currentUser;
+    }
+
+    final released = await _releaseIncompleteAuthUser(email);
+    if (!released) {
+      throw FirebaseAuthException(
+        code: 'invalid-credential',
+        message:
+            'Could not continue with this Gmail. Use the same password from your first attempt, then tap Verify Gmail again.',
+      );
+    }
+
+    final recreated = await auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    return recreated.user;
+  }
+
+  Future<bool> _releaseIncompleteAuthUser(String email) async {
+    HttpClient? client;
+    try {
+      client = HttpClient();
+      final request = await client.postUrl(
+        Uri.parse(
+          'https://us-central1-trackit-fac8a.cloudfunctions.net/releaseIncompleteRegistrationEmail',
+        ),
+      );
+      request.headers.contentType = ContentType.json;
+      request.add(utf8.encode(jsonEncode({'data': {'email': email}})));
+      final response = await request.close();
+      final body = await utf8.decodeStream(response);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return true;
+      }
+      if (body.contains('ALREADY_EXISTS') || body.contains('already in use')) {
+        throw FirebaseAuthException(code: 'email-already-in-use');
+      }
+      return false;
+    } on FirebaseAuthException {
+      rethrow;
+    } catch (_) {
+      return false;
+    } finally {
+      client?.close(force: true);
+    }
+  }
+
+  Future<bool> _signInWithKnownPassword(String email, String password) async {
+    final auth = FirebaseAuth.instance;
+    final pending = await _readPendingPassword(email);
+    final candidates = <String>{password, if (pending != null && pending.isNotEmpty) pending};
+    for (final candidate in candidates) {
+      try {
+        await auth.signInWithEmailAndPassword(email: email, password: candidate);
+        return true;
+      } on FirebaseAuthException {
+        await auth.signOut();
+      }
+    }
+    return false;
+  }
+
+  Future<void> _rememberPendingPassword(String email, String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      StorageKeys.pendingGmailRegistration,
+      '$email\u0001$password',
+    );
+  }
+
+  Future<String?> _readPendingPassword(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(StorageKeys.pendingGmailRegistration);
+    if (raw == null || raw.isEmpty) return null;
+    final parts = raw.split('\u0001');
+    if (parts.length != 2) return null;
+    if (parts[0].toLowerCase() != email) return null;
+    return parts[1];
+  }
+
+  Future<void> _sendVerificationEmail(User user) async {
+    try {
+      await user.sendEmailVerification(
+        ActionCodeSettings(
+          url: 'https://$trackitFirebaseAuthDomain/',
+          handleCodeInApp: false,
+        ),
+      );
+    } on FirebaseAuthException catch (error) {
+      if (error.code != 'unauthorized-continue-uri') {
+        rethrow;
+      }
+      await user.sendEmailVerification();
+    }
+  }
+
   Future<void> _ensureFirebaseReady() async {
     if (!FirestoreSyncService.instance.isReady) {
       await FirestoreSyncService.instance.initialize();
     }
-  }
-
-  String _mapExistingAccountSignInError(FirebaseAuthException error) {
-    if (_isCredentialError(error)) {
-      return 'This Gmail was already used in a previous sign-up attempt with a different password. '
-          'Use the same password as before, or reset it from the login screen, then try again.';
-    }
-    return _mapAuthError(error);
-  }
-
-  bool _isCredentialError(FirebaseAuthException error) {
-    return error.code == 'wrong-password' ||
-        error.code == 'invalid-credential' ||
-        error.code == 'invalid-login-credentials';
   }
 
   bool _isConsumedActionCode(FirebaseAuthException error) {
@@ -227,24 +349,25 @@ class StudentRegistrationVerificationService {
       case 'invalid-email':
         return 'Enter a valid Gmail address.';
       case 'email-already-in-use':
-        return 'This Gmail is already registered. Try signing in instead.';
+        return gmailAlreadyInUseMessage;
       case 'weak-password':
         return 'Password is too weak. Use at least 8 characters.';
       case 'wrong-password':
       case 'invalid-credential':
       case 'invalid-login-credentials':
-        return 'Could not verify this Gmail with the password you entered. '
-            'If you tried registering before, use the same password or reset it from the login screen.';
+        return 'Could not continue with this Gmail. Use the same password from your first attempt, then tap Verify Gmail again.';
       case 'too-many-requests':
         return 'Too many attempts. Wait a few minutes and try again.';
       case 'user-disabled':
         return 'This Gmail account is disabled. Contact support or use another Gmail.';
       case 'expired-action-code':
-        return 'This verification link has expired. Request a new verification email.';
+        return 'This verification has expired. Request a new verification email.';
       case 'invalid-action-code':
-        return 'This verification link was already used or is invalid. Request a new verification email.';
+        return 'Open Gmail and confirm the verification email, then tap Continue.';
       case 'operation-not-allowed':
         return 'Email/password sign-in is not enabled in Firebase.';
+      case 'unauthorized-continue-uri':
+        return 'Gmail verification is blocked because this app domain is not allowlisted in Firebase Authentication.';
       default:
         final message = error.message?.trim();
         if (message != null && message.isNotEmpty) {

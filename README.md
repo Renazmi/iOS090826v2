@@ -27,7 +27,7 @@ The center **+** button opens the event QR scanner (`TRACKIT-EVENT-{id}`), match
 
 ## Not in Phase 1
 
-Events list, QR attendance, voting, messages, reports, profile settings screens — planned for later phases.
+Events list, QR attendance, messages, reports, profile settings screens — planned for later phases.
 
 ## Run
 
@@ -72,7 +72,7 @@ Always run Flutter commands from the **`mobile`** folder (where `pubspec.yaml` i
 | Student | `DEMO202601` | `DemoAttendee1` |
 | Officer | `demo.officer@trackit.local` | `DemoOfficer1` |
 | Officer (President) | `john.delacruz@trackit.local` | `Faithturtogo01` |
-| Officer (Vice President) | `renazmi29@gmail.com` | `Lanceenri29` |
+| Officer (Vice President) | `lanceenridiamzon@gmail.com` | `Lanceenri29` |
 
 ## Architecture
 

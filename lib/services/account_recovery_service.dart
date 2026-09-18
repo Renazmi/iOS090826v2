@@ -3,14 +3,21 @@ import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../config/firestore_collections.dart';
 import '../config/storage_keys.dart';
 import '../utils/firebase_action_link.dart';
+import '../utils/password_hash.dart';
 import '../utils/password_reset_link.dart';
+import '../utils/settings_validation.dart';
 import 'firestore_sync_service.dart';
 import 'officer_auth_service.dart';
 import 'sections_service.dart';
 import 'storage_service.dart';
 import 'student_auth_service.dart';
+
+enum _AuthUserState { created, existing }
 
 enum RecoveryAccountKind { student, officer, admin, coAdmin }
 
@@ -197,12 +204,31 @@ class AccountRecoveryService {
   String? _recoveryOobCode;
   String? _recoveryEmail;
 
+  Future<RecoveryAccountLookup> lookupAccount(String identifier) async {
+    final raw = identifier.trim();
+    if (raw.isEmpty) {
+      return const RecoveryAccountLookup.fail(
+        'Enter the Gmail address associated with your account.',
+      );
+    }
+
+    if (!SettingsValidation.isValidEmailFormat(raw)) {
+      return const RecoveryAccountLookup.fail('Enter a valid Gmail address.');
+    }
+
+    final email = raw.toLowerCase();
+    await _pullAdminCredentialsFromServer();
+    await _studentAuth.refreshStudentFromServer(email);
+    await _officerAuth.refreshOfficerFromServer(email);
+    return lookupAccountByGmail(email);
+  }
+
   RecoveryAccountLookup lookupAccountByGmail(String gmail) {
     final email = gmail.trim().toLowerCase();
     if (email.isEmpty) {
       return const RecoveryAccountLookup.fail('Enter your Gmail address.');
     }
-    if (!email.contains('@')) {
+    if (!SettingsValidation.isValidEmailFormat(email)) {
       return const RecoveryAccountLookup.fail('Enter a valid Gmail address.');
     }
 
@@ -239,6 +265,9 @@ class AccountRecoveryService {
 
     final student = _studentAuth.findStudentByGmail(email);
     if (student != null) {
+      if (!_studentAuth.isStudentActive(student.studentId)) {
+        return const RecoveryAccountLookup.fail(studentDeactivatedLoginMessage);
+      }
       if (student.gmail.trim().isEmpty) {
         return const RecoveryAccountLookup.fail(
           'This account has no Gmail on file. Please contact your administrator to reset your password.',
@@ -278,6 +307,10 @@ class AccountRecoveryService {
       );
     }
 
+    if (!_studentAuth.isStudentActive(id)) {
+      return const RecoveryStudentIdLookup.fail(studentDeactivatedLoginMessage);
+    }
+
     final lookup = _studentAuth.lookupStudentForPasswordReset(id);
     if (!lookup.success) {
       return RecoveryStudentIdLookup.fail(
@@ -314,6 +347,7 @@ class AccountRecoveryService {
   }
 
   Future<RecoveryCodeResult> sendRecoveryCodeForStudentId(String studentId) async {
+    await _studentAuth.refreshStudentFromServer(studentId);
     final lookup = lookupStudentByIdForRecovery(studentId);
     if (!lookup.success) {
       return RecoveryCodeResult.fail(lookup.error ?? 'Could not find your account.');
@@ -328,8 +362,8 @@ class AccountRecoveryService {
     return sendRecoveryCode(lookup.recoveryEmail!);
   }
 
-  Future<RecoveryCodeResult> sendRecoveryCode(String gmail) async {
-    final lookup = lookupAccountByGmail(gmail);
+  Future<RecoveryCodeResult> sendRecoveryCode(String identifier) async {
+    final lookup = await lookupAccount(identifier);
     if (!lookup.success || lookup.email == null) {
       return RecoveryCodeResult.fail(lookup.error ?? 'Could not find your account.');
     }
@@ -339,11 +373,14 @@ class AccountRecoveryService {
     try {
       await _ensureFirebaseReady();
       final auth = FirebaseAuth.instance;
-      await _ensureAuthUser(auth, lookup.email!);
+      final authState = await _ensureAuthUser(auth, lookup.email!);
       await auth.sendPasswordResetEmail(
         email: lookup.email!,
         actionCodeSettings: trackitFirebasePasswordResetSettings(),
       );
+      if (authState == _AuthUserState.existing) {
+        await _markLookupAuthLinked(lookup);
+      }
     } on FirebaseAuthException catch (error) {
       return RecoveryCodeResult.fail(_mapAuthError(error));
     } catch (_) {
@@ -352,6 +389,7 @@ class AccountRecoveryService {
       );
     }
 
+    _recoveryEmail = lookup.email;
     return RecoveryCodeResult.ok(lookup.maskedEmail ?? _maskEmail(lookup.email!));
   }
 
@@ -370,7 +408,7 @@ class AccountRecoveryService {
       _recoveryOobCode = oobCode;
       _recoveryEmail = resetEmail;
 
-      final lookup = lookupAccountByGmail(resetEmail);
+      final lookup = await lookupAccount(resetEmail);
       if (!lookup.success || lookup.kind == null || lookup.email == null) {
         return RecoveryLinkResolveResult.fail(
           lookup.error ?? 'No TrackIT account found for this reset link.',
@@ -433,7 +471,7 @@ class AccountRecoveryService {
     String newPassword,
     String confirmPassword,
   ) async {
-    final lookup = lookupAccountByGmail(gmail);
+    final lookup = await lookupAccount(gmail);
     if (!lookup.success || lookup.kind == null || lookup.email == null) {
       return RecoveryResetResult.fail(lookup.error ?? 'Account not found.');
     }
@@ -450,7 +488,7 @@ class AccountRecoveryService {
 
     if (_recoveryOobCode == null) {
       return const RecoveryResetResult.fail(
-        'Verification expired. Request a new reset email and try again.',
+        'This reset link has expired. Request a new reset email and try again.',
       );
     }
 
@@ -464,6 +502,11 @@ class AccountRecoveryService {
       return const RecoveryResetResult.fail('Passwords do not match.');
     }
 
+    final persist = await _persistRecoveredPassword(lookup, newPassword);
+    if (!persist.success) {
+      return persist;
+    }
+
     try {
       await _ensureFirebaseReady();
       await FirebaseAuth.instance.confirmPasswordReset(
@@ -471,15 +514,26 @@ class AccountRecoveryService {
         newPassword: newPassword,
       );
     } on FirebaseAuthException catch (error) {
-      return RecoveryResetResult.fail(_mapAuthError(error));
+      if (persist.loginId == null) {
+        return RecoveryResetResult.fail(_mapAuthError(error));
+      }
     } catch (_) {
-      return const RecoveryResetResult.fail(
-        'Could not reset password. Check your connection and try again.',
-      );
+      if (persist.loginId == null) {
+        return const RecoveryResetResult.fail(
+          'Could not reset password. Check your connection and try again.',
+        );
+      }
     } finally {
       _clearRecoverySession();
     }
 
+    return persist;
+  }
+
+  Future<RecoveryResetResult> _persistRecoveredPassword(
+    RecoveryAccountLookup lookup,
+    String newPassword,
+  ) async {
     switch (lookup.kind!) {
       case RecoveryAccountKind.student:
         if (lookup.studentId == null) {
@@ -492,6 +546,11 @@ class AccountRecoveryService {
         if (!result.success) {
           return RecoveryResetResult.fail(result.error ?? 'Could not reset your password.');
         }
+        if (result.warning != null && result.warning!.isNotEmpty) {
+          return RecoveryResetResult.fail(result.warning!);
+        }
+        await _studentAuth.refreshStudentFromServer(lookup.studentId!);
+        await _studentAuth.markStudentFirebaseAuthLinked(lookup.studentId!);
         return RecoveryResetResult.ok(lookup.studentId!);
 
       case RecoveryAccountKind.officer:
@@ -499,15 +558,22 @@ class AccountRecoveryService {
           return const RecoveryResetResult.fail('Officer account not found.');
         }
         await _officerAuth.resetOfficerPasswordFromRecovery(lookup.officerId!, newPassword);
+        await _officerAuth.markOfficerFirebaseAuthLinked(lookup.officerId!);
         return RecoveryResetResult.ok(lookup.email!);
 
       case RecoveryAccountKind.admin:
-        await _storage.writeString(StorageKeys.adminPassword, newPassword);
+        final saved = await _persistMainAdminPassword(newPassword);
+        if (!saved) {
+          return const RecoveryResetResult.fail(
+            'Could not save to the account server. Check your connection and try again.',
+          );
+        }
+        await _markAdminFirebaseAuthLinked();
         return RecoveryResetResult.ok(lookup.email!);
 
       case RecoveryAccountKind.coAdmin:
-        final updated = await _updateCoAdminPassword(lookup.email!, newPassword);
-        if (!updated) {
+        final saved = await _updateCoAdminPassword(lookup.email!, newPassword, linked: true);
+        if (!saved) {
           return const RecoveryResetResult.fail('Could not reset your password.');
         }
         return RecoveryResetResult.ok(lookup.email!);
@@ -520,17 +586,45 @@ class AccountRecoveryService {
     }
   }
 
-  Future<void> _ensureAuthUser(FirebaseAuth auth, String email) async {
+  Future<_AuthUserState> _ensureAuthUser(FirebaseAuth auth, String email) async {
     final random = Random.secure();
     final buffer = List.generate(16, (_) => random.nextInt(256));
     final tempPassword = '${base64UrlEncode(buffer)}Aa1!';
 
     try {
       await auth.createUserWithEmailAndPassword(email: email, password: tempPassword);
+      await auth.signOut();
+      return _AuthUserState.created;
     } on FirebaseAuthException catch (error) {
       if (error.code != 'email-already-in-use') {
         rethrow;
       }
+      return _AuthUserState.existing;
+    }
+  }
+
+  Future<void> _markLookupAuthLinked(RecoveryAccountLookup lookup) async {
+    switch (lookup.kind) {
+      case RecoveryAccountKind.student:
+        if (lookup.studentId != null) {
+          await _studentAuth.markStudentFirebaseAuthLinked(lookup.studentId!);
+        }
+        break;
+      case RecoveryAccountKind.officer:
+        if (lookup.officerId != null) {
+          await _officerAuth.markOfficerFirebaseAuthLinked(lookup.officerId!);
+        }
+        break;
+      case RecoveryAccountKind.admin:
+        await _markAdminFirebaseAuthLinked();
+        break;
+      case RecoveryAccountKind.coAdmin:
+        if (lookup.email != null) {
+          await _updateCoAdminPassword(lookup.email!, null, linked: true);
+        }
+        break;
+      case null:
+        break;
     }
   }
 
@@ -575,6 +669,68 @@ class AccountRecoveryService {
     return defaultAdminEmail;
   }
 
+  Future<void> _pullAdminCredentialsFromServer() async {
+    try {
+      await _ensureFirebaseReady();
+      if (!FirestoreSyncService.instance.isReady) return;
+      final snap = await FirestoreSyncService.instance.db
+          .collection(FirestoreCollections.adminAccounts)
+          .doc('credentials')
+          .get(const GetOptions(source: Source.server));
+      if (!snap.exists) return;
+      final data = snap.data();
+      if (data == null) return;
+      final username = '${data['username'] ?? data['loginEmail'] ?? data['email'] ?? ''}'
+          .trim()
+          .toLowerCase();
+      if (username.isNotEmpty) {
+        await _storage.writeString(StorageKeys.adminUsername, username);
+      }
+      final passwordHash = '${data['passwordHash'] ?? ''}'.trim();
+      if (passwordHash.isNotEmpty) {
+        await _storage.writeString(
+          StorageKeys.adminPassword,
+          isHashedPassword(passwordHash) ? passwordHash : hashPassword(passwordHash),
+        );
+      }
+      final coAdmins = data['coAdmins'];
+      if (coAdmins is List) {
+        await _storage.writeString(StorageKeys.coAdmins, jsonEncode(coAdmins));
+      }
+      if (data['firebaseAuthLinked'] == true) {
+        await _storage.writeString(StorageKeys.adminFirebaseAuthLinked, '1');
+      }
+    } catch (_) {}
+  }
+
+  Future<bool> _persistMainAdminPassword(String newPassword) async {
+    final hashed = hashPassword(newPassword);
+    await _storage.writeString(StorageKeys.adminPassword, hashed);
+    try {
+      await _ensureFirebaseReady();
+      if (!FirestoreSyncService.instance.isReady) return false;
+      final username = _getMainAdminEmail();
+      await FirestoreSyncService.instance.db
+          .collection(FirestoreCollections.adminAccounts)
+          .doc('credentials')
+          .set(
+            {
+              'username': username,
+              'loginEmail': username,
+              'email': username,
+              'passwordHash': hashed,
+              'firebaseAuthLinked': true,
+              'updatedAt': DateTime.now().toUtc().toIso8601String(),
+            },
+            SetOptions(merge: true),
+          );
+      await _storage.writeString(StorageKeys.adminFirebaseAuthLinked, '1');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Map<String, dynamic>? _findCoAdmin(String email) {
     final raw = _storage.readString(StorageKeys.coAdmins);
     if (raw == null || raw.isEmpty) return null;
@@ -593,7 +749,29 @@ class AccountRecoveryService {
     return null;
   }
 
-  Future<bool> _updateCoAdminPassword(String email, String newPassword) async {
+  Future<void> _markAdminFirebaseAuthLinked() async {
+    await _storage.writeString(StorageKeys.adminFirebaseAuthLinked, '1');
+    try {
+      await _ensureFirebaseReady();
+      if (!FirestoreSyncService.instance.isReady) return;
+      await FirestoreSyncService.instance.db
+          .collection(FirestoreCollections.adminAccounts)
+          .doc('credentials')
+          .set(
+            {
+              'firebaseAuthLinked': true,
+              'updatedAt': DateTime.now().toUtc().toIso8601String(),
+            },
+            SetOptions(merge: true),
+          );
+    } catch (_) {}
+  }
+
+  Future<bool> _updateCoAdminPassword(
+    String email,
+    String? newPassword, {
+    bool linked = false,
+  }) async {
     final raw = _storage.readString(StorageKeys.coAdmins);
     if (raw == null || raw.isEmpty) return false;
     try {
@@ -604,7 +782,12 @@ class AccountRecoveryService {
         if (item is Map) {
           final map = Map<String, dynamic>.from(item);
           if ('${map['email'] ?? ''}'.trim().toLowerCase() == email) {
-            map['password'] = newPassword;
+            if (newPassword != null) {
+              map['password'] = hashPassword(newPassword);
+            }
+            if (linked) {
+              map['firebaseAuthLinked'] = true;
+            }
             changed = true;
           }
           return map;
@@ -613,6 +796,22 @@ class AccountRecoveryService {
       }).toList();
       if (!changed) return false;
       await _storage.writeString(StorageKeys.coAdmins, jsonEncode(updated));
+      try {
+        await _ensureFirebaseReady();
+        if (!FirestoreSyncService.instance.isReady) return false;
+        await FirestoreSyncService.instance.db
+            .collection(FirestoreCollections.adminAccounts)
+            .doc('credentials')
+            .set(
+              {
+                'coAdmins': updated,
+                'updatedAt': DateTime.now().toUtc().toIso8601String(),
+              },
+              SetOptions(merge: true),
+            );
+      } catch (_) {
+        return false;
+      }
       return true;
     } catch (_) {
       return false;

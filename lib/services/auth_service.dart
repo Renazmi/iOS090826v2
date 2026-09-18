@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../config/storage_keys.dart';
 import '../data/seed_data.dart';
 import '../models/auth_session.dart';
@@ -11,19 +13,26 @@ import 'storage_service.dart';
 import 'student_auth_service.dart';
 
 class AuthResult {
-  const AuthResult.success(this.session) : error = null, needsProfileCompletion = false;
+  const AuthResult.success(this.session)
+      : error = null,
+        needsProfileCompletion = false,
+        deactivated = false;
 
-  const AuthResult.failure(this.error)
+  const AuthResult.failure(this.error, {this.deactivated = false})
       : session = null,
         needsProfileCompletion = false;
 
   const AuthResult.profileRequired(this.session)
       : error = null,
-        needsProfileCompletion = true;
+        needsProfileCompletion = true,
+        deactivated = false;
 
   final AuthSession? session;
   final String? error;
   final bool needsProfileCompletion;
+
+  /// The credentials matched but an admin deactivated the account.
+  final bool deactivated;
 
   bool get isSuccess => session != null && error == null;
 }
@@ -107,8 +116,13 @@ class AuthService {
   }
 
   Future<AuthResult> loginStudent(String studentId, String password) async {
-    var student = _studentAuth.verifyStudentLogin(studentId, password);
-    student ??= await _studentAuth.acceptRemotePasswordIfValid(studentId, password);
+    await _studentAuth.refreshStudentFromServer(studentId);
+    final result = await _studentAuth.completeStudentPasswordLogin(studentId, password);
+    if (result.deactivated) {
+      return const AuthResult.failure(studentDeactivatedLoginMessage, deactivated: true);
+    }
+
+    final student = result.student;
     if (student == null) {
       return const AuthResult.failure('Invalid Student ID or password.');
     }
@@ -133,8 +147,8 @@ class AuthService {
   }
 
   Future<AuthResult> loginOfficer(String email, String password) async {
-    var officer = _officerAuth.verifyOfficerLogin(email, password);
-    officer ??= await _officerAuth.acceptRemotePasswordIfValid(email, password);
+    await _officerAuth.refreshOfficerFromServer(email);
+    final officer = await _officerAuth.completeOfficerPasswordLogin(email, password);
     if (officer == null) {
       return const AuthResult.failure('Invalid officer email or password.');
     }
@@ -158,6 +172,10 @@ class AuthService {
     await _storage.remove(StorageKeys.mobileSession);
     await _studentAuth.clearCurrentStudent();
     await _officerAuth.clearCurrentOfficer();
+    await _storage.remove(StorageKeys.pendingProfileStudentId);
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
   }
 
   Future<void> _persistSession() async {

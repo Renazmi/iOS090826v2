@@ -1,0 +1,310 @@
+COLLEGE OF COMPUTER STUDIES
+CCS – ASP: ALLIANCE OF STUDENT PROGRAMMERS
+
+CONSTITUTION AND BY-LAWS OF
+CCS – ASP: ALLIANCE OF STUDENT PROGRAMMERS
+
+ARTICLE I
+CCS – ASP: ALLIANCE OF STUDENT PROGRAMMERS
+
+Section 1. CCS – ASP: ALLIANCE OF STUDENT PROGRAMMERS
+This organization shall be known as ASP — Alliance of Student Programmers. The use of the term ASP in this document shall be understood to refer to the auxiliary student organization of the E.L.I.T.E organization of College of Computer Studies of the Dominican College of Tarlac, Inc.
+
+Section 2. ASP Logo
+
+2.1 The term “ASP”
+The term ASP stands for Alliance of Student Programmers. It represents a united group of students who are committed to learning programming, developing IT skills, helping fellow students, and becoming competent and responsible future IT professionals.
+The word Alliance signifies unity, teamwork, collaboration, and shared responsibility among student members. It reflects the organization’s goal of building a supportive community where students learn, code, and lead together.
+The word Student identifies the members of the organization as learners who are developing their programming knowledge and skills.
+The word Programmers represents the main focus of the organization, which is programming, coding, problem-solving, and the responsible use of Information Technology.
+
+2.2 The Code Brackets Symbol
+The angle brackets < > used in the logo represent coding, web development, and programming syntax. These symbols reflect the organization’s connection to Information Technology and programming-related learning activities.
+
+2.3 The Slash Symbol
+The slash / represents a closing tag commonly used in programming and web development. It symbolizes completion, structure, discipline, and the organization’s goal of guiding students toward quality programming outputs.
+
+2.4 The Circuit Lines and Nodes
+The circuit lines and circular nodes represent technology, digital connection, innovation, and collaboration. They symbolize the connection among student programmers, mentors, and learners who share knowledge and support one another through peer learning and programming activities.
+
+2.5 The Tagline
+The tagline “Learn • Code • Lead” represents the purpose of the organization. Learn stands for gaining knowledge in programming and IT; Code represents applying knowledge through hands-on practice and projects; and Lead represents developing student leadership, responsibility, and the ability to guide fellow students.
+
+ARTICLE II
+VISION, MISSION, GOALS, AND OBJECTIVES
+
+Section 1. General Mission
+To support the College of Computer Studies in attaining academic excellence by promoting programming literacy, digital competence, and peer-based learning, while helping students develop problem-solving skills, produce quality outputs, and become productive, responsible, and future-ready Christian Filipino IT professionals.
+
+Section 2. Vision
+To become a supportive, innovative, and student-centered programming organization under the College of Computer Studies that is fully responsive to the learning needs of students and highly committed to inspiring competent, responsible, and skilled future IT professionals through collaboration, programming activities, and technology-driven growth.
+
+Section 3. Goals
+1. Promote programming literacy and IT competence among students
+Provide opportunities for students to develop basic knowledge, skills, and confidence in programming and other essential Information Technology tools.
+
+2. Support peer-to-peer learning and collaboration
+Create a supportive learning environment where students can guide, mentor, and assist one another in understanding programming concepts, IT tools, and technology-related skills.
+
+3. Encourage academic excellence and quality outputs
+Help students improve their academic performance by engaging them in coding practice, collaborative projects, programming activities, and technology-based outputs.
+
+4. Develop problem-solving and logical thinking skills
+Train students to analyze problems, design solutions, and apply programming knowledge in practical situations that prepare them for future careers and occupations.
+
+5. Inspire students to pursue IT-related careers
+Encourage students to recognize Information Technology as a meaningful and relevant career path that can help them meet the changing needs of society and the computing industry.
+
+6. Provide opportunities for continuous skills development
+Organize tutorials, coding sessions, workshops, seminars, competitions, and other activities that allow students to expand their IT knowledge and keep abreast with changing times.
+
+7. Promote responsible and productive use of technology
+Guide students in using software, hardware, programming tools, and digital platforms ethically, effectively, and productively in their studies and future professional work.
+
+Section 4. Objectives
+1. To equip students with fundamental programming knowledge and IT skills
+Provide students with a strong foundation in programming and basic IT tools that will help them meet academic requirements and future industry computing needs.
+
+2. To provide student-led tutorials, coding sessions, and workshops
+Support quality instruction, training, and education by conducting activities that help students improve their understanding and application of programming concepts.
+
+3. To develop problem-solving strategies and effective work habits
+Engage students in hands-on coding activities, group projects, and programming challenges that strengthen their logical thinking, discipline, teamwork, and career readiness.
+
+4. To promote collaboration and peer mentoring
+Encourage skilled students to assist beginners, share knowledge, and help build the confidence of other students in learning programming and Information Technology.
+
+5. To help students maximize the value of Information Technology
+Expose students to useful software, hardware, platforms, and programming practices that improve productivity and support their academic and personal development.
+
+6. To support the department’s goal of producing competent IT students
+Encourage active participation in academic, technical, and organization-based activities that contribute to the development of competent and responsible IT learners.
+
+7. To inspire students to become productive and responsible Christian Filipino IT professionals
+Promote values-oriented leadership, responsible technology use, community involvement, and personal growth through programming and IT-related activities.
+
+ARTICLE III
+Membership
+
+Section 1. Rights and Responsibilities of Members
+1.1 Membership in the organization is open to individuals who share an interest in and commitment to the vision and mission of the organization.
+1.2 All members have the right to attend and participate in all meetings of the organization.
+1.3 All members shall obey and comply with the by-laws, rules, and regulations that may be promulgated by the organization from time to time.
+1.4 All members shall possess and continuously uphold the following qualities and qualifications:
+
+I. Good Character
+Members shall demonstrate respect, discipline, responsibility, honesty, cooperation, and proper conduct in all organization activities, meetings, and interactions with fellow students, officers, faculty, and school personnel.
+
+II. Academic Integrity
+Members shall practice honesty and fairness in all academic and programming-related activities. They shall avoid plagiarism, cheating, unauthorized copying of codes, and any form of dishonesty that violates school policies and the values of the organization.
+
+III. Fundamental Programming Literacy
+Members shall have basic knowledge or willingness to learn programming concepts, coding practices, logical thinking, and the proper use of Information Technology tools. They shall participate in activities that improve their programming skills and technical competence.
+
+IV. Good Communication Skills
+Members shall communicate clearly, respectfully, and responsibly with fellow members, officers, mentors, and participants. They shall be willing to share ideas, ask questions, provide assistance, and collaborate with others in achieving the goals of the organization.
+
+V. Teamwork
+Members shall show willingness to work with others, support fellow students, share responsibilities, and contribute actively to group activities, projects, and programming-related tasks. They shall value cooperation, respect different ideas, and help maintain a positive and productive learning environment.
+
+1.5 All members shall undergo an interim membership period of one (1) year. During this period, members are expected to actively participate in meetings, programming activities, peer-learning sessions, workshops, and other organization programs. The interim membership period shall serve as an evaluation period to determine the member’s commitment, good character, academic integrity, teamwork, communication skills, and willingness to develop fundamental programming literacy. After completing one (1) year, the member may be recognized as a regular member in good standing, subject to the evaluation and approval of the officers and the Consultant.
+
+Section 2. Good Standing and Expulsion of Members
+2.1 Any member who pays all required dues, attends meetings set by the organization, and has not failed to perform assigned duties shall be considered a member in good standing.
+2.2 A member who has not been in good standing for two (2) consecutive semesters may be considered for expulsion.
+
+ARTICLE IV
+Meetings
+
+Section 1. General Meetings
+General meetings shall be held regularly, depending on the urgency of project production, and all members shall be notified in advance. These meetings shall provide updates on projects, finances, and other important matters.
+
+Section 2. Special Meetings
+Special meetings of the members shall be called by the officers whenever the need arises. The notice of every special meeting shall briefly state the purpose of the meeting. No other business shall be considered at such meeting except with the consent of the members present. Notice of the meeting may be waived verbally by any member attending it.
+
+Section 3. Notice of Meetings
+Notice of the date, time, and place of general and other meetings of the members shall be given personally, by electronic mail, or through announcements at least one week before the date set for the meeting. In urgent cases, the notice may be communicated at least two (2) days before the meeting, either personally, through cellular communication, or through announcements when direct contact is not possible.
+
+Section 4. Expenses
+The Council of Officers shall pre-set a ceiling for the expenses to be incurred in the preparation, conduct, and summary/documentation of each project. The Officers shall also pre-set a ceiling for the expenses to be incurred in the preparation, conduct, and summary/documentation of every project.
+
+ARTICLE V
+Council
+
+Section 1. Function
+The E.L.I.T.E. Officers shall serve as the Council of Officers and shall be the governing body of the organization. They shall manage its affairs; that is, the corporate powers of the organization shall be exercised, its business conducted, and its property controlled by the Council.
+
+Section 2. Term of Office
+The council shall hold office for two (2) semesters beginning first Friday of July of the year they were elected and until their successors are duly elected and qualified.
+
+ARTICLE VI
+Officers
+
+Section 1. Officers
+The officers of the organization shall be the President, Vice President, Secretary, Treasurer, Auditor, Public Information Officer, Programming Director, Education and Mentorship Director, and Student Mentors.
+
+Section 2. Appointment
+The appointment process for officers in the organization shall involve a series of steps to ensure that qualified, responsible, and committed individuals are selected to fill leadership roles.
+All applicants for officer positions shall undergo an interview conducted by the ASP Consultant. The interview shall assess the applicant’s qualifications, skills, leadership potential, commitment to the organization, and ability to perform the duties and responsibilities of the position being applied for.
+
+Section 3. Application and Screening
+Applicants for officer position should submit a written application or statement of intent and a portfolio, outlining their qualifications, experience, and vision for the role. An applicant may submit these documents to the Consultant.
+The Consultant shall serve as the screening committee and shall screen the applicants to ensure that they meet the eligibility criteria and qualifications outlined in this Constitution and By-Laws.
+
+Section 4. Term of Office
+An officer shall hold office for two (2) semesters, beginning in the month of the year he/she is appointed to his/her position and continuing until his/her successor is duly appointed.
+
+Section 4. Succession
+In the event that an officer is unable to perform his/her duties, the Consultant shall appoint an Officer-in-Charge (OIC) or an Acting Officer from among the qualified officers or members. The appointee shall serve during the absence of the officer.
+
+Section 5. Vacancy
+Should a vacancy arise in any position in the organization, the Consultant shall appoint a replacement. The appointed individual shall serve for the remainder of the term.
+
+ARTICLE VII
+Duties of the Officers
+
+Section 1. President
+He/she shall preside over meetings, represent the organization in official functions, coordinate with the Consultant, and ensure that the organization provides meaningful opportunities for students to learn programming, develop IT skills, produce quality outputs, and become productive and responsible future IT professionals.
+
+Section 2. Vice President
+The Vice President shall assist the President in performing his/her duties and responsibilities. He/she shall help monitor the progress of officers, committees, and activities to ensure that all programs are properly implemented. In the absence or incapacity of the President, the Vice President shall assume the duties and responsibilities of the President. He/she shall also support the organization in promoting peer-to-peer learning, collaboration, and continuous skills development among student programmers.
+
+Section 3. Secretary
+The Secretary shall be responsible for preparing minutes of meetings, maintaining attendance records, organizing official documents, and handling written communication of the organization. He/she shall assist in preparing letters, activity proposals, reports, and other documents needed for tutorials, workshops, seminars, coding sessions, competitions, and other activities that support the academic and technical development of students.
+
+Section 4. Treasurer
+The Treasurer shall be responsible for managing the funds and financial resources of the organization. He/she shall record collections, donations, expenses, and other financial transactions. He/she shall prepare financial reports, budget proposals, and liquidation reports to ensure that organization funds are used properly and responsibly for activities that support programming literacy, student development, quality instruction, and IT-related programs.
+
+Section 5. Auditor
+The Auditor shall examine and verify the financial records of the organization. He/she shall ensure transparency, accountability, and proper use of funds. He/she shall review expenses and financial reports to make sure that all resources are used in accordance with the organization’s goals, especially in providing workshops, training, programming activities, and other student-centered programs.
+
+Section 6. Public Information Officer
+The Public Information Officer shall be responsible for disseminating announcements, updates, and important information regarding the activities, programs, and projects of the organization. He/she shall promote ASP activities such as programming tutorials, coding sessions, seminars, workshops, competitions, and peer-learning programs through appropriate communication platforms. He/she shall help encourage student participation and promote awareness of the value of Information Technology.
+
+Section 7. Programming Director
+The Programming Director shall lead the technical and programming-related activities of the organization. He/she shall plan, organize, and supervise coding tutorials, programming workshops, debugging sessions, project-building activities, coding challenges, application development projects, and other technical training programs. He/she shall help equip students with fundamental programming knowledge and skills needed to meet academic and future industry computing needs.
+
+7.1 Application Development Teams
+The Programming Director shall create, organize, and supervise application development teams composed of qualified officers and members of the organization. These teams shall serve as the technical working groups responsible for developing approved software projects and technology-based outputs of the organization.
+The application development teams shall include the following:
+
+7.2 Programming Director Technical Members
+There shall be twelve (12) Programming Associates under the Programming Director. The recommended position title for these members shall be Programming Associates, with specific assignments according to skill, project need, and approval of the Programming Director and the Consultant.
+The Programming Director may adjust the specific assignments of the Programming Associates depending on the needs of the approved project, provided that all changes remain consistent with the organization's Constitution and By-Laws and are coordinated with the Consultant.
+
+Section 8. Education and Mentorship Director
+The Education and Mentorship Director shall be responsible for organizing peer-learning, mentoring, and academic support activities. He/she shall coordinate student-led tutorials, study groups, beginner programming assistance, and mentoring sessions to help students improve their understanding of programming and Information Technology. He/she shall encourage skilled students to assist beginners and promote confidence, collaboration, and academic excellence.
+
+8.1 Student Mentor
+The Student Mentor body shall assist the Education and Mentorship Director in conducting peer-learning, mentoring, and academic support activities. All officers of the organization shall automatically be part of the Student Mentor body and shall help support tutorials, study groups, beginner programming assistance, mentoring sessions, and student development activities. In addition to the officers, ten (10) qualified members shall be selected or appointed as additional Student Mentors under the Education and Mentorship Director.
+
+ARTICLE VIII
+RULES, DUTIES AND RESPONSIBILITIES OF DEVELOPMENT TEAMS AND STUDENT MENTORS
+
+Section 1. General Rule
+All rules, duties, and responsibilities stated in this Article shall govern the Programming Director Technical Members, Mobile Application Development Team, Web Application Development Team, Desktop Application Development Team, and Student Mentor body. These rules shall support proper coordination, responsible technology use, academic integrity, teamwork, and quality project outputs.
+
+Section 2. Rules for Application Development Teams and Programming Associates
+2.1 Team members and Programming Associates shall be selected from officers and members who demonstrate good character, academic integrity, teamwork, communication skills, willingness to learn, and basic or developing programming competence.
+2.2 Each development team shall be headed by a Team Lead designated by the Programming Director, subject to the guidance of the Consultant and coordination with the President and concerned officers.
+2.3 Every application development project shall have a clear project plan, assigned roles, target output, timeline, documentation, and evaluation process before implementation.
+2.4 Team members shall observe academic integrity, proper coding practices, responsible technology use, confidentiality of project information when needed, and respect for school policies and intellectual property rights.
+2.5 No project shall be released, deployed, submitted, or represented as an official output of the organization without review and approval by the Programming Director, concerned officers, Consultant, and other approving authorities when required.
+2.6 Team members shall attend meetings, submit progress updates, participate in testing and debugging, and complete assigned tasks within the agreed timeline.
+
+Section 3. Duties and Responsibilities of Application Development Teams and Programming Associates
+The Mobile, Web, and Desktop Application Development Teams and the Programming Associates shall perform the following duties and responsibilities:
+a. Analyze project needs, gather requirements, and propose appropriate technical solutions for approved projects.
+b. Design user interfaces, workflows, databases, and system features that are useful, accessible, and appropriate for the intended users.
+c. Develop, test, debug, document, and improve applications according to the standards and objectives of the organization.
+d. Coordinate with the Programming Director, Education and Mentorship Director, Student Mentors, officers, members, and project beneficiaries to ensure that outputs meet academic and organizational needs.
+e. Prepare technical documentation, user guides, reports, source code records, and other required project materials.
+f. Assist in training, demonstrations, deployment, turnover, and maintenance activities related to completed applications or systems.
+
+Section 4. Rules for Student Mentors
+4.1 All officers shall automatically serve as part of the Student Mentor body by virtue of their office and shall help guide members and participants during mentoring, tutorials, workshops, coding sessions, and academic support activities.
+4.2 In addition to the officers, ten (10) qualified members shall be selected or appointed as additional Student Mentors based on good character, academic integrity, communication skills, teamwork, willingness to help, and sufficient understanding of programming and Information Technology concepts.
+4.3 The additional Student Mentors shall serve under the supervision of the Education and Mentorship Director, in coordination with the Programming Director when the mentoring activity involves coding, application development, debugging, or technical training.
+4.4 Student Mentors shall observe patience, respect, honesty, confidentiality when needed, responsible technology use, and academic integrity. They shall guide students in learning and shall not encourage cheating, plagiarism, unauthorized copying of code, or improper completion of academic requirements.
+4.5 Student Mentors shall attend assigned mentoring activities, prepare learning materials when needed, monitor the progress of mentees, and submit reports or feedback to the Education and Mentorship Director.
+
+Section 5. Duties and Responsibilities of Student Mentors
+The Student Mentors shall serve as peer educators who help fellow students understand basic programming concepts, coding practices, problem-solving strategies, and proper use of Information Technology tools. They shall guide beginners in building confidence, improving academic performance, and developing fundamental programming literacy. They shall also promote cooperation, patience, responsibility, academic integrity, communication, and teamwork in all mentoring activities.
+Student Mentors may also assist the Mobile, Web, and Desktop Application Development Teams by helping members understand project requirements, basic coding concepts, debugging procedures, documentation practices, and responsible collaboration during approved development activities.
+
+ARTICLE IX
+ORGANIZATION’S EXPENSES
+
+Section 1. Requisition of Budget for Projects
+Budget requisition shall be made two (2) days prior to the project production. The requisition process shall include requesting, justifying, and obtaining approval from the Officers of E.L.I.T.E. for financial expenditures related to project production.
+
+Section 2. Budget Development
+The members of the organization may begin creating a comprehensive budget for the project production. The budget should outline all expected expenses, including pre-production, production, post-production, and distribution costs. The requested expenses may be categorized into logical groups such as personnel, equipment, location, post-production, marketing, and miscellaneous costs.
+
+Section 3. Expense Requisition Form
+The members of the organization may request an expense requisition form from the E.L.I.T.E. Officers. The form shall include the following information: date of request; name of the person making the request; description of the expense; expense category; amount requested; justification or reason for the expense; supporting documents, such as quotations, invoices, or receipts; and the project or production phase to which the expense is allocated.
+
+Section 4. Review and Approval of Request
+The E.L.I.T.E. organization shall review the requisition for accuracy, alignment with the budget, and appropriateness. They may also verify that the requested expense is essential to the project production. Once the expense requisition is approved, the Treasurer of the E.L.I.T.E. organization shall communicate with the person who made the request and provide any specific guidelines or instructions for making the expenditure.
+
+Section 5. Reporting and Closing Out Expenses
+The members of the organization shall provide expense reports to the E.L.I.T.E. organization. These reports should compare actual expenditures with the budget and explain any variances. After the production is complete, all expenses shall be reconciled, all outstanding bills shall be paid, and the budget shall be closed out.
+
+ARTICLE X
+PROJECTS AND PROJECT PRODUCTION
+
+Section 1. Types of Projects
+The organization may undertake a wide range of projects depending on its niche, expertise, and objectives. The following are the possible types of projects to be developed by the organization:
+
+1.1 Programming Tutorials and Coding Sessions – This includes conducting beginner-friendly and advanced programming tutorials, coding sessions, and hands-on activities that will help students understand programming concepts, syntax, logic, and proper coding practices.
+
+1.2 Peer Mentoring and Academic Support - This includes providing peer-to-peer assistance, study groups, mentoring sessions, and academic support for students who need help in programming, Information Technology subjects, and related coursework.
+
+1.3 Programming Workshops and Technical Training - This includes conducting technical workshops, hands-on training sessions, and skills-development activities that expose members to real-world programming tasks and prepare them for future IT roles.
+
+1.4 Coding Challenges and Programming Competitions - This includes developing and conducting coding challenges, programming contests, hackathons, logic-based activities, and problem-solving competitions that will improve students’ analytical thinking, creativity, and programming skills.
+
+1.5 Software and System Development Projects – This includes creating software applications, web systems, mobile applications, database systems, and other technology-based outputs that allow students to apply their programming knowledge in practical and meaningful projects.
+
+1.6 IT Solutions and Programming Services – This includes providing programming-related assistance and IT solutions for approved academic, departmental, or school-related needs, such as simple systems, automation tools, websites, digital forms, and other software-based services.
+
+1.7 Educational and Instructional Materials - This includes developing learning materials such as programming guides, handouts, video tutorials, sample codes, e-learning resources, and instructional content that will help students improve their understanding of programming and Information Technology.
+
+1.8 Technology Awareness Programs - This includes organizing orientations and talks related to programming, Information Technology trends, career opportunities, responsible technology use, cybersecurity awareness, and future readiness in the IT industry.
+
+1.9 Collaborative Programming Projects
+This includes group-based coding projects where members work together to practice teamwork, project planning, problem-solving, documentation, and software development processes.
+
+1.10 Outreach and Student Support Programs
+This includes activities that promote programming literacy and digital competence among students through volunteer teaching, peer assistance, and other support programs that encourage students to pursue Information Technology.
+
+Section 2. Project Proposal and Approval
+All projects and activities of the organization shall be properly planned and presented through a project proposal. The proposal shall include the project title, objectives, target participants, date and venue, program flow, budget requirements, needed materials, persons involved, and expected output.
+The project proposal shall be submitted to the E.L.I.T.E. Officers and the Consultant for review and approval before implementation.
+
+Section 3. Project Implementation
+Approved projects shall be implemented by the assigned officers, directors, committees, and members of the organization. The project team shall ensure proper coordination, preparation of materials, documentation, attendance monitoring, and observance of school policies and guidelines.
+
+Section 4. Project Documentation
+All projects and activities shall be properly documented. Documentation may include attendance sheets, photos, videos, reports, outputs, certificates, evaluation forms, and other records needed to verify the completion and impact of the project.
+
+Section 5. Project Evaluation
+After every project or activity, the organization shall conduct an evaluation to determine the effectiveness, strengths, weaknesses, and areas for improvement of the project. The evaluation shall help the organization improve future activities and ensure that its programs continue to support programming literacy, peer learning, academic excellence, and student development.
+
+Section 6. Project Output
+The organization shall aim to produce quality outputs that reflect the knowledge, skills, creativity, responsibility, and teamwork of its members. These outputs may include programs, systems, websites, applications, learning materials, reports, and other IT-related products that support the mission, vision, goals, and objectives of the organization.
+
+ARTICLE XI
+Amendments, Repeals and New By-Laws
+
+Section 1.
+Any member of the organization may submit proposed amendments in writing to the E.L.I.T.E. Officers.
+
+Section 2.
+Such proposals shall be published and distributed to all members of the organization during its annual meetings.
+
+Section 3.
+This constitution and by-laws may be amended by affirmation by at least two-thirds (2/3) of the votes officially present or represented at a general meeting at which a quorum of the general membership is present.
+
+Section 4.
+Amendments duly approved shall take effect immediately.

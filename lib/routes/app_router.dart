@@ -81,6 +81,10 @@ GoRouter createAppRouter(AppState appState) {
         },
       ),
       GoRoute(
+        path: '/officer/organizations',
+        builder: (context, state) => const OrganizationsScreen(),
+      ),
+      GoRoute(
         path: '/officer/events/publish',
         builder: (context, state) {
           final editParam = state.uri.queryParameters['edit'];

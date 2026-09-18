@@ -50,7 +50,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>TrackIT needs camera access to scan event QR codes and capture attendance selfies.</string>
+	<string>TrackIT needs camera access to take a registration selfie, scan event QR codes, and capture attendance selfies.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>TrackIT may use the microphone when attaching a video from the camera in Messages.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

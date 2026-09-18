@@ -10,7 +10,6 @@ import 'package:provider/provider.dart';
 import '../../config/app_theme.dart';
 import '../../config/trackit_colors.dart';
 import '../../models/event_item.dart';
-import '../../models/officer.dart';
 import '../../services/app_state.dart';
 import '../../services/attendance_service.dart';
 import '../../utils/attendance_selfie_picker.dart';
@@ -218,21 +217,6 @@ class _AttendanceCheckInScreenState extends State<AttendanceCheckInScreen> {
       return;
     }
 
-    if (app.roles.isOfficer) {
-      final officer = app.auth.currentOfficer;
-      if (officer != null) {
-        final assignError = _validateOfficerAssignment(widget.event, officer);
-        if (assignError != null) {
-          setState(() {
-            _processing = false;
-            _errorMessage = assignError.message;
-            _lastScan = null;
-          });
-          return;
-        }
-      }
-    }
-
     await _stopCameras();
     if (!mounted) return;
 
@@ -245,13 +229,6 @@ class _AttendanceCheckInScreenState extends State<AttendanceCheckInScreen> {
       _errorMessage = null;
     });
     await _startSelfiePreview();
-  }
-
-  AttendanceResult? _validateOfficerAssignment(EventItem event, Officer officer) {
-    if (!event.assignAll && !event.assignedOfficerIds.contains(officer.id)) {
-      return const AttendanceResult.fail('You are not assigned to this event.');
-    }
-    return null;
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
@@ -347,7 +324,7 @@ class _AttendanceCheckInScreenState extends State<AttendanceCheckInScreen> {
       SnackBar(
         content: Text(
           widget.mode == AttendanceCheckInMode.timeIn
-              ? 'Timed in successfully.'
+              ? (result.message ?? 'Timed in successfully.')
               : 'Timed out successfully.',
         ),
         backgroundColor: AppTheme.green,

@@ -15,7 +15,7 @@ class RoleService {
 
   bool get isAuthenticated => _auth.session?.isAuthenticated ?? false;
 
-  String get displayName => _auth.session?.displayName ?? 'Guest';
+  String get displayName => _auth.session?.displayName ?? '';
 
   String get roleLabel {
     switch (currentRole) {
@@ -26,7 +26,7 @@ class RoleService {
       case TrackitRole.admin:
         return 'Admin';
       case null:
-        return 'Guest';
+        return '';
     }
   }
 }

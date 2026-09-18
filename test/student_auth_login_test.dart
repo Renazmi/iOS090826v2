@@ -108,6 +108,116 @@ void main() {
     });
   });
 
+  group('deactivated student accounts', () {
+    const studentId = '202501005';
+    const gmail = 'deactivated.student@gmail.com';
+    const password = 'DeactivatePass9';
+
+    Map<String, dynamic> accountRow({String status = 'active'}) => {
+          'studentId': studentId,
+          'fullName': 'Deactivated Student',
+          'phone': '09171234577',
+          'gmail': gmail,
+          'password': hashPassword(password),
+          'verified': true,
+          'status': status,
+          'profileCompleted': true,
+        };
+
+    Future<StudentAuthService> buildService({
+      String accountStatus = 'active',
+      String rosterStatus = 'active',
+    }) async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = await StorageService.create();
+      await storage.writeJsonObject(StorageKeys.sectionRoster, {
+        '4A': [
+          {
+            'studentId': studentId,
+            'name': 'Deactivated Student',
+            'section': '4A',
+            'status': rosterStatus,
+          },
+        ],
+      });
+      await storage.writeJsonList(StorageKeys.students, [
+        accountRow(status: accountStatus),
+      ]);
+
+      final sections = SectionsService(storage);
+      await sections.initialize();
+      return StudentAuthService(storage, ApiService(storage), sections);
+    }
+
+    test('a deactivated account cannot sign in with ID or gmail', () async {
+      final studentAuth = await buildService(accountStatus: 'inactive');
+
+      expect(studentAuth.isStudentActive(studentId), isFalse);
+      expect(studentAuth.verifyStudentLogin(studentId, password), isNull);
+      expect(studentAuth.verifyStudentLogin(gmail, password), isNull);
+
+      final result = studentAuth.verifyStudentLoginResult(studentId, password);
+      expect(result.ok, isFalse);
+      expect(result.deactivated, isTrue);
+      expect(result.error, studentDeactivatedLoginMessage);
+    });
+
+    test('a deactivated roster entry blocks an otherwise active account', () async {
+      final studentAuth = await buildService(rosterStatus: 'inactive');
+
+      expect(studentAuth.isStudentActive(studentId), isFalse);
+      expect(studentAuth.verifyStudentLoginResult(studentId, password).deactivated, isTrue);
+      expect(
+        studentAuth.getStudentRegistrationBlock(studentId),
+        studentDeactivatedRegisterMessage,
+      );
+    });
+
+    test('a wrong password still reports invalid credentials', () async {
+      final studentAuth = await buildService(accountStatus: 'inactive');
+
+      final result = studentAuth.verifyStudentLoginResult(studentId, 'wrong-password');
+      expect(result.ok, isFalse);
+      expect(result.deactivated, isFalse);
+    });
+
+    test('a reactivated account signs in with the same credentials', () async {
+      final studentAuth = await buildService();
+
+      expect(studentAuth.isStudentActive(studentId), isTrue);
+      expect(studentAuth.verifyStudentLogin(studentId, password)?.studentId, studentId);
+      expect(studentAuth.verifyStudentLogin(gmail, password)?.studentId, studentId);
+    });
+
+    test('an account with no status field stays active', () async {
+      SharedPreferences.setMockInitialValues({});
+      final storage = await StorageService.create();
+      final row = accountRow()..remove('status');
+      await storage.writeJsonList(StorageKeys.students, [row]);
+
+      final sections = SectionsService(storage);
+      final studentAuth = StudentAuthService(storage, ApiService(storage), sections);
+
+      expect(studentAuth.getStudentById(studentId)?.isActive, isTrue);
+      expect(studentAuth.verifyStudentLogin(studentId, password)?.studentId, studentId);
+    });
+
+    test('an active session ends once the account is deactivated', () async {
+      final studentAuth = await buildService();
+      final student = studentAuth.verifyStudentLogin(studentId, password);
+      expect(student, isNotNull);
+
+      await studentAuth.setCurrentStudent(student!);
+      expect(studentAuth.getCurrentStudentAccount()?.studentId, studentId);
+
+      // Simulates the admin deactivation arriving from Firestore.
+      final storage = await StorageService.create();
+      await storage.writeJsonList(StorageKeys.students, [accountRow(status: 'inactive')]);
+
+      expect(studentAuth.getCurrentStudentAccount(), isNull);
+    });
+  });
+
   group('firebase verification code parsing', () {
     test('extracts oobCode from firebase action links', () {
       const code = 'ABC123xyz789012345678';

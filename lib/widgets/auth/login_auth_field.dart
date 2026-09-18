@@ -52,6 +52,8 @@ class LoginAuthField extends StatelessWidget {
         TextField(
           controller: controller,
           readOnly: readOnly,
+          enableInteractiveSelection: !readOnly,
+          canRequestFocus: !readOnly,
           obscureText: obscureText,
           keyboardType: keyboardType,
           textInputAction: textInputAction,

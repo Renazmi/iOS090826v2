@@ -72,10 +72,10 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   void initState() {
     super.initState();
     final initialGmail = widget.initialGmail.trim();
-    _studentFlow = !initialGmail.contains('@');
+    _studentFlow = false;
     _step = widget.initialOobCode.trim().isNotEmpty
         ? _ForgotStep.verify
-        : (_studentFlow ? _ForgotStep.studentId : _ForgotStep.gmail);
+        : _ForgotStep.gmail;
     _studentIdController.text = widget.initialStudentId.trim();
     _gmailController.text = initialGmail;
     _codeController.text = widget.initialOobCode.trim();
@@ -174,7 +174,11 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
       _sendingCode = true;
     });
 
-    final lookup = widget.accountRecovery.lookupAccountByGmail(_gmailController.text);
+    final gmail = _gmailController.text.trim().isNotEmpty
+        ? _gmailController.text
+        : _recoveryGmail;
+
+    final lookup = await widget.accountRecovery.lookupAccount(gmail);
     if (!lookup.success) {
       if (!mounted) return;
       setState(() {
@@ -188,7 +192,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     _maskedEmail = lookup.maskedEmail ?? '';
     _recoveryGmail = lookup.email ?? '';
 
-    final result = await widget.accountRecovery.sendRecoveryCode(_gmailController.text);
+    final result = await widget.accountRecovery.sendRecoveryCode(gmail);
 
     if (!mounted) return;
 
@@ -309,11 +313,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   }
 
   Future<void> _resendCode() async {
-    if (_studentFlow) {
-      await _submitStudentSendCode();
-    } else {
-      await _submitGmailSendCode();
-    }
+    await _submitGmailSendCode();
   }
 
   @override
@@ -336,7 +336,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      _studentFlow ? 'Reset student password' : 'Recover account',
+                      _studentFlow ? 'Reset password' : 'Forgot password',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -396,7 +396,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                     ],
                     if (_step == _ForgotStep.gmail) ...[
                       Text(
-                        'Enter your Gmail address. A password reset email will be sent to your inbox.',
+                        'Enter the Gmail address on your TrackIT account. If it is registered, a time-limited reset link will be sent there.',
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.75), height: 1.45),
                       ),
                       const SizedBox(height: 16),
@@ -688,7 +688,7 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => setState(() {
-                          _step = _studentFlow ? _ForgotStep.confirmStudent : _ForgotStep.gmail;
+                          _step = _ForgotStep.gmail;
                         }),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white70,

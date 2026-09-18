@@ -15,6 +15,7 @@ import '../../widgets/common/trackit_decorations.dart';
 import '../../widgets/common/trackit_page_layout.dart';
 import '../../widgets/common/trackit_scaffold.dart';
 import '../../widgets/common/trackit_text_field.dart';
+import '../../widgets/org/org_bylaws_settings_card.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -23,6 +24,10 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final role = app.roles.currentRole;
+
+    if (role == null) {
+      return const SizedBox.shrink();
+    }
 
     if (role == TrackitRole.officer) {
       return const _OfficerSettingsBody();
@@ -487,6 +492,7 @@ class _StudentSettingsBodyState extends State<_StudentSettingsBody> {
               roleLabel: app.roles.roleLabel,
               imageUrl: photoUrl,
             ),
+          if (student != null) const OrgBylawsSettingsCard(),
           _ProfilePhotoSection(
             imageUrl: photoUrl,
             fallbackLetter: student?.fullName ?? '',
@@ -693,6 +699,7 @@ class _OfficerSettingsBody extends StatefulWidget {
 
 class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
   final _nameController = TextEditingController();
+  final _studentIdController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _currentPasswordController = TextEditingController();
@@ -719,6 +726,7 @@ class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
     final officer = context.read<AppState>().auth.currentOfficer;
     if (officer == null) return;
     _nameController.text = officer.name;
+    _studentIdController.text = officer.studentId?.trim() ?? '';
     _emailController.text = officer.email;
     _phoneController.text = officer.phone ?? '';
   }
@@ -726,6 +734,7 @@ class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
   @override
   void dispose() {
     _nameController.dispose();
+    _studentIdController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _currentPasswordController.dispose();
@@ -848,9 +857,15 @@ class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
       _profileSuccess = null;
     });
 
+    final officer = app.auth.currentOfficer;
+    if (officer == null) {
+      setState(() => _profileError = 'You are not signed in.');
+      return;
+    }
+
     final validationError = SettingsValidation.validateOfficerProfile(
       fullName: _nameController.text,
-      email: _emailController.text,
+      email: officer.email,
       phone: _phoneController.text,
     );
     if (validationError != null) {
@@ -861,15 +876,15 @@ class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
     final confirmed = await confirmTrackitAction(
       context,
       title: 'Save profile',
-      message: 'Your name, email, and phone number will be updated.',
+      message: 'Your name and phone number will be updated.',
       confirmLabel: 'Save profile',
     );
     if (!confirmed || !mounted) return;
 
     setState(() => _savingProfile = true);
 
-    final officer = app.auth.currentOfficer;
-    if (officer == null) {
+    final signedInOfficer = app.auth.currentOfficer;
+    if (signedInOfficer == null) {
       setState(() {
         _savingProfile = false;
         _profileError = 'You are not signed in.';
@@ -878,9 +893,8 @@ class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
     }
 
     final result = await app.officerAuth.updateOfficerAccount(
-      officer.id,
+      signedInOfficer.id,
       name: _nameController.text,
-      email: _emailController.text,
       phone: _phoneController.text,
     );
 
@@ -996,6 +1010,7 @@ class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
               roleLabel: app.roles.roleLabel,
               imageUrl: officer.profilePictureUrl,
             ),
+          if (officer != null) const OrgBylawsSettingsCard(),
           _ProfilePhotoSection(
             imageUrl: officer?.profilePictureUrl,
             fallbackLetter: officer?.name ?? '',
@@ -1014,9 +1029,16 @@ class _OfficerSettingsBodyState extends State<_OfficerSettingsBody> {
                 TrackitTextField(label: 'Full name', controller: _nameController),
                 const SizedBox(height: 14),
                 TrackitTextField(
-                  label: 'Gmail / username',
+                  label: 'Student ID',
+                  controller: _studentIdController,
+                  readOnly: true,
+                ),
+                const SizedBox(height: 14),
+                TrackitTextField(
+                  label: 'Gmail',
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  readOnly: true,
                 ),
                 const SizedBox(height: 14),
                 TrackitTextField(
@@ -1379,10 +1401,7 @@ class _LogoutSection extends StatelessWidget {
     return TrackitLogoutCard(
       onLogout: () => confirmLogoutAndExit(
         context,
-        onLogout: () async {
-          await app.auth.logout();
-          app.notifyAuthChanged();
-        },
+        app: app,
       ),
     );
   }
@@ -1434,7 +1453,7 @@ class TrackitAppearanceCard extends StatelessWidget {
               ],
             ),
           ),
-          Switch.adaptive(
+          Switch(
             value: isDarkMode,
             activeTrackColor: const Color(0xFFC62828).withValues(alpha: 0.55),
             activeThumbColor: const Color(0xFFC62828),

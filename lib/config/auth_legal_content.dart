@@ -3,6 +3,20 @@ abstract final class AuthLegalContent {
   static const consentText =
       'By continuing, you agree to our Terms of Use and acknowledge our Privacy Policy.';
 
+  static const privacyNoticeTitle = 'Data Privacy Notice';
+
+  static const privacyNoticeIntro =
+      'Please read this notice in full before creating a TrackIT account. You must scroll to the bottom, then confirm that you understand how your personal data is processed.';
+
+  static const privacyNoticeCheckbox =
+      'I have read and understood the Data Privacy Notice.';
+
+  static const privacyNoticeScrollHint =
+      'Scroll to the bottom of the Data Privacy Notice to enable the confirmation checkbox.';
+
+  static const privacyNoticeRequired =
+      'Scroll to the bottom of the Data Privacy Notice and check the box before you can continue.';
+
   static const developmentTeam = [
     DevelopmentTeamMember(
       role: 'Software Engineer',
@@ -46,7 +60,7 @@ abstract final class AuthLegalContent {
         AuthLegalSection(
           heading: '2. Acceptable use',
           body:
-              'You agree to use TrackIT only for legitimate academic and organizational purposes, including attendance, events, officer records, voting, and related reporting. You may not attempt to access data outside your role, disrupt the service, or upload unlawful or harmful content.',
+              'You agree to use TrackIT only for legitimate academic and organizational purposes, including attendance, events, officer records, and related reporting. You may not attempt to access data outside your role, disrupt the service, or upload unlawful or harmful content.',
         ),
         AuthLegalSection(
           heading: '3. Account security',
@@ -73,7 +87,7 @@ abstract final class AuthLegalContent {
         AuthLegalSection(
           heading: 'Information we collect',
           body:
-              'TrackIT processes information needed to operate organization management: student and officer identifiers, names, contact details (e.g., Gmail, phone), attendance and event participation, voting activity where applicable, profile photos you upload, and administrative audit logs of system actions.',
+              'TrackIT processes information needed to operate organization management: student and officer identifiers, names, contact details (e.g., Gmail, phone), attendance and event participation, profile photos you upload, and administrative audit logs of system actions.',
         ),
         AuthLegalSection(
           heading: 'How we use information',

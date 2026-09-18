@@ -141,7 +141,7 @@ const defaultOfficerPasswords = <int, String>{
 /// Primary mobile login accounts — emails stay in sync; changed passwords are kept.
 const primaryOfficerLogins = <({int officerId, String email, String password})>[
   (officerId: 1, email: 'renazmi30@gmail.com', password: 'Lanceenri29'),
-  (officerId: 2, email: 'renazmi29@gmail.com', password: 'Lanceenri29'),
+  (officerId: 2, email: 'lanceenridiamzon@gmail.com', password: 'Lanceenri29'),
 ];
 
 /// Dedicated mobile beta-test officer logins (passwords persist after change/reset).
@@ -165,8 +165,6 @@ const mobileTestOfficerLogins = <({int officerId, String email, String password}
 
 /// Alternate login emails that map to an existing officer record.
 const defaultOfficerEmailAliases = <String, int>{
-  'renazmi29@gmail.com': 2,
-  'renazmi30@gmail.com': 1,
   'elite.president@trackit.local': 1,
   'john.delacruz@trackit.local': 1,
   'faith.turtogo@trackit.local': 1,
@@ -223,7 +221,7 @@ List<Officer> buildDefaultOfficers() {
         hobby: 'Reading, Public speaking, Chess',
         achievements: ['Outstanding Officer 2023', 'Best Thesis Award', 'Leadership Excellence Award'],
         profilePictureUrl: 'assets/images/bangate.jpg'),
-    _officer(2, 'Lance Enri Diamzon', 'Vice President', 'renazmi29@gmail.com', '3', 'B', 1,
+    _officer(2, 'Lance Enri Diamzon', 'Vice President', 'lanceenridiamzon@gmail.com', '3', 'B', 1,
         studentId: '2021001235', phone: '+63 923 456 7890'),
     _officer(3, 'Santos Gicelle', 'Secretary', 'carlos.reyes@trackit.local', '3', 'C', 1,
         studentId: '2021001236', phone: '+63 934 567 8901'),

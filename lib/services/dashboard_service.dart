@@ -3,6 +3,7 @@ import '../models/officer.dart';
 import '../models/organization.dart';
 import '../models/report.dart';
 import '../models/student_account.dart';
+import '../data/class_roster_officers.dart';
 import 'attendance_service.dart';
 import 'auth_service.dart';
 import 'chat_service.dart';
@@ -112,8 +113,10 @@ class DashboardService {
         roleLabel: 'Officer',
         organizationName: org?.name ?? '—',
         positionLabel: officer.position,
-        totalOfficers: _officerAuth.officers.length,
-        organizationsCount: _organizations.organizations.length,
+        totalOfficers: _countCurrentOrgOfficers(),
+        organizationsCount: _organizations.organizations
+            .where((org) => org.id != classRosterOrganizationId)
+            .length,
         eventsTodayCount: _events.countEventsToday(),
         totalReports: _reports.reports.length,
         checkInsToday: _attendance.countCheckInsToday(),
@@ -123,5 +126,18 @@ class DashboardService {
       eventsToday: _events.eventsToday(),
       recentReports: _reports.recentReports(limit: 4),
     );
+  }
+
+  int _countCurrentOrgOfficers() {
+    final orgIds = _organizations.organizations
+        .where((org) => org.id != classRosterOrganizationId)
+        .map((org) => org.id)
+        .toSet();
+    final seen = <int>{};
+    for (final officer in _officerAuth.officers) {
+      if (!orgIds.contains(officer.organizationId)) continue;
+      seen.add(officer.id);
+    }
+    return seen.length;
   }
 }

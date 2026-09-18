@@ -15,6 +15,7 @@ class Officer {
     this.bio,
     this.achievements,
     this.hobby,
+    this.firebaseAuthLinked = false,
   });
 
   final int id;
@@ -32,6 +33,7 @@ class Officer {
   final String? bio;
   final List<String>? achievements;
   final String? hobby;
+  final bool firebaseAuthLinked;
 
   factory Officer.fromJson(Map<String, dynamic> json) {
     return Officer(
@@ -52,6 +54,7 @@ class Officer {
           ?.map((e) => '$e')
           .toList(),
       hobby: json['hobby'] as String?,
+      firebaseAuthLinked: json['firebaseAuthLinked'] as bool? ?? false,
     );
   }
 
@@ -71,6 +74,7 @@ class Officer {
         if (bio != null) 'bio': bio,
         if (achievements != null) 'achievements': achievements,
         if (hobby != null) 'hobby': hobby,
+        'firebaseAuthLinked': firebaseAuthLinked,
       };
 
   Officer copyWith({
@@ -79,6 +83,7 @@ class Officer {
     String? phone,
     int? organizationId,
     String? profilePictureUrl,
+    bool? firebaseAuthLinked,
     bool clearProfilePicture = false,
   }) {
     return Officer(
@@ -98,6 +103,7 @@ class Officer {
       bio: bio,
       achievements: achievements,
       hobby: hobby,
+      firebaseAuthLinked: firebaseAuthLinked ?? this.firebaseAuthLinked,
     );
   }
 }

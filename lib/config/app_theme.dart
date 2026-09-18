@@ -65,10 +65,22 @@ abstract final class AppTheme {
         ),
       ];
 
+  /// Same Material transitions on iOS and Android so screens feel identical.
+  static const pageTransitions = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: ZoomPageTransitionsBuilder(),
+      TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+      TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+    },
+  );
+
   static ThemeData light() {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      visualDensity: VisualDensity.standard,
+      splashFactory: InkRipple.splashFactory,
+      pageTransitionsTheme: pageTransitions,
       scaffoldBackgroundColor: bg,
       extensions: const [TrackitColors.light],
       colorScheme: ColorScheme.fromSeed(
@@ -165,6 +177,9 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      visualDensity: VisualDensity.standard,
+      splashFactory: InkRipple.splashFactory,
+      pageTransitionsTheme: pageTransitions,
       scaffoldBackgroundColor: Colors.transparent,
       extensions: const [TrackitColors.dark],
       colorScheme: ColorScheme.fromSeed(

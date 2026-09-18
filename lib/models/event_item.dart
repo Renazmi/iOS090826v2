@@ -30,6 +30,7 @@ class EventItem {
     this.timeOutWindowStart,
     this.timeOutWindowEnd,
     this.timeOutWindowEndDate,
+    this.lateGraceMinutes,
     this.geofenceEnabled = false,
     this.geofenceLatitude,
     this.geofenceLongitude,
@@ -66,6 +67,9 @@ class EventItem {
   final String? timeOutWindowStart;
   final String? timeOutWindowEnd;
   final String? timeOutWindowEndDate;
+
+  /// Minutes past the time-in window end that still count as Present.
+  final int? lateGraceMinutes;
   final bool geofenceEnabled;
   final double? geofenceLatitude;
   final double? geofenceLongitude;
@@ -106,6 +110,7 @@ class EventItem {
       timeOutWindowStart: json['timeOutWindowStart'] as String?,
       timeOutWindowEnd: json['timeOutWindowEnd'] as String?,
       timeOutWindowEndDate: json['timeOutWindowEndDate'] as String?,
+      lateGraceMinutes: (json['lateGraceMinutes'] as num?)?.toInt(),
       geofenceEnabled: json['geofenceEnabled'] as bool? ?? false,
       geofenceLatitude: (json['geofenceLatitude'] as num?)?.toDouble(),
       geofenceLongitude: (json['geofenceLongitude'] as num?)?.toDouble(),
@@ -146,6 +151,7 @@ class EventItem {
         if (timeOutWindowStart != null) 'timeOutWindowStart': timeOutWindowStart,
         if (timeOutWindowEnd != null) 'timeOutWindowEnd': timeOutWindowEnd,
         if (timeOutWindowEndDate != null) 'timeOutWindowEndDate': timeOutWindowEndDate,
+        if (lateGraceMinutes != null) 'lateGraceMinutes': lateGraceMinutes,
         'geofenceEnabled': geofenceEnabled,
         if (geofenceLatitude != null) 'geofenceLatitude': geofenceLatitude,
         if (geofenceLongitude != null) 'geofenceLongitude': geofenceLongitude,
@@ -208,6 +214,7 @@ class EventItem {
     String? timeOutWindowStart,
     String? timeOutWindowEnd,
     String? timeOutWindowEndDate,
+    int? lateGraceMinutes,
     String? imageUrl,
     bool clearImageUrl = false,
     bool? geofenceEnabled,
@@ -248,6 +255,7 @@ class EventItem {
       timeOutWindowStart: timeOutWindowStart ?? this.timeOutWindowStart,
       timeOutWindowEnd: timeOutWindowEnd ?? this.timeOutWindowEnd,
       timeOutWindowEndDate: timeOutWindowEndDate ?? this.timeOutWindowEndDate,
+      lateGraceMinutes: lateGraceMinutes ?? this.lateGraceMinutes,
       geofenceEnabled: geofenceEnabled ?? this.geofenceEnabled,
       geofenceLatitude: geofenceLatitude ?? this.geofenceLatitude,
       geofenceLongitude: geofenceLongitude ?? this.geofenceLongitude,

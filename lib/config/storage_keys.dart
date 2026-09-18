@@ -42,7 +42,10 @@ abstract final class StorageKeys {
   static const adminUsername = 'trackit_admin_username';
   static const adminDisplayName = 'trackit_admin_display_name';
   static const coAdmins = 'trackit_coadmins';
+  static const adminFirebaseAuthLinked = 'trackit_admin_firebase_auth_linked';
 
   // Account recovery OTP (session-like)
   static const recoveryOtpPrefix = 'trackit_recovery_otp_';
+
+  static const pendingGmailRegistration = 'trackit_pending_gmail_reg';
 }

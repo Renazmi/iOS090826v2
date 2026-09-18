@@ -20,9 +20,9 @@ class FirestoreSyncService {
         await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       }
     } on FirebaseException catch (e) {
-      if (e.code != 'duplicate-app') return;
+      if (e.code != 'duplicate-app' && Firebase.apps.isEmpty) return;
     } catch (_) {
-      return;
+      if (Firebase.apps.isEmpty) return;
     }
     _initialized = true;
   }

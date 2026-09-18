@@ -1,3 +1,5 @@
+import '../models/event_item.dart';
+
 /// Shared HH:mm window helpers for event time-in / time-out.
 class EventTimeWindows {
   static int? parseTimeMinutes(String hhmm) {
@@ -78,6 +80,22 @@ class EventTimeWindows {
     return null;
   }
 
+  /// Time in is gated by the window start only. The window end is the
+  /// Present/Late threshold, so it never blocks a late time in.
+  static String? getTimeInOpensMessage(String whenDate, String? start, {DateTime? now}) {
+    final startTrimmed = start?.trim() ?? '';
+    if (startTrimmed.isEmpty) return null;
+    final startDt = parseLocalDateTime(whenDate, startTrimmed);
+    if (startDt == null) return null;
+    if ((now ?? DateTime.now()).isBefore(startDt)) {
+      return 'Time in opens $whenDate at $startTrimmed.';
+    }
+    return null;
+  }
+
+  static bool isTimeInOpen(String whenDate, String? start, {DateTime? now}) =>
+      getTimeInOpensMessage(whenDate, start, now: now) == null;
+
   static bool isWithinConfiguredWindow(
     String whenDate,
     String? start,
@@ -93,5 +111,49 @@ class EventTimeWindows {
           endDate: endDate,
         ) ==
         null;
+  }
+
+  static EventStatus resolveLiveEventStatus({
+    required String whenDate,
+    String? whenTime,
+    String? timeInWindowStart,
+    String? timeOutWindowEnd,
+    String? timeOutWindowEndDate,
+    DateTime? now,
+  }) {
+    final clock = now ?? DateTime.now();
+    final startTime = (whenTime ?? '00:00').trim().isEmpty ? '00:00' : (whenTime ?? '00:00').trim();
+    var start = parseLocalDateTime(whenDate, startTime);
+    // Time in may open before the scheduled time, so the event turns current then.
+    final inStart = timeInWindowStart?.trim();
+    if (start != null && inStart != null && inStart.isNotEmpty) {
+      final windowStart = parseLocalDateTime(whenDate, inStart);
+      if (windowStart != null && windowStart.isBefore(start)) {
+        start = windowStart;
+      }
+    }
+    if (start == null) {
+      final today = todayDateKey();
+      if (whenDate.compareTo(today) > 0) return EventStatus.upcoming;
+      if (whenDate.compareTo(today) < 0) return EventStatus.previous;
+      return EventStatus.current;
+    }
+
+    if (clock.isBefore(start)) return EventStatus.upcoming;
+
+    var end = DateTime(start.year, start.month, start.day, 23, 59, 59, 999);
+    final outEnd = timeOutWindowEnd?.trim();
+    if (outEnd != null && outEnd.isNotEmpty) {
+      final endDate = (timeOutWindowEndDate?.trim().isNotEmpty == true)
+          ? timeOutWindowEndDate!.trim()
+          : whenDate;
+      final windowEnd = parseLocalDateTime(endDate, outEnd);
+      if (windowEnd != null && windowEnd.isAfter(end)) {
+        end = windowEnd;
+      }
+    }
+
+    if (clock.isAfter(end)) return EventStatus.previous;
+    return EventStatus.current;
   }
 }

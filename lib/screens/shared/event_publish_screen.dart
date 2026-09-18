@@ -8,8 +8,11 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_theme.dart';
 import '../../config/event_constants.dart';
+import '../../data/class_roster_officers.dart';
 import '../../models/event_item.dart';
 import '../../models/geofence_coordinate.dart';
+import '../../models/officer.dart';
+import '../../models/organization.dart';
 import '../../services/app_state.dart';
 import '../../services/events_service.dart';
 import '../../utils/trackit_responsive.dart';
@@ -29,6 +32,7 @@ class EventPublishScreen extends StatefulWidget {
 class _EventPublishScreenState extends State<EventPublishScreen> {
   final _titleController = TextEditingController();
   final _whereController = TextEditingController(text: EventConstants.dctDefaultWhere);
+  final _officerSearchController = TextEditingController();
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
@@ -40,6 +44,7 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
   EventScope _eventScope = EventScope.school;
   bool _assignAll = false;
   final Set<int> _selectedOfficerIds = {};
+  int? _expandedOrgId;
   bool _expireQrWhenEventDone = true;
   String? _imageUrl;
   EventGeofenceState _geofence = EventGeofenceState.dctDefault();
@@ -129,6 +134,7 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
   void dispose() {
     _titleController.dispose();
     _whereController.dispose();
+    _officerSearchController.dispose();
     super.dispose();
   }
 
@@ -140,6 +146,277 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
+  bool _isAssignableOfficer(AppState app, Officer officer) {
+    if (officer.organizationId == classRosterOrganizationId) return false;
+    return app.organizations.getById(officer.organizationId) != null;
+  }
+
+  List<Officer> _assignableOfficers(AppState app) {
+    return app.officerAuth.officers.where((officer) => _isAssignableOfficer(app, officer)).toList();
+  }
+
+  List<_AssignOrgGroup> _assignOrgGroups(AppState app, {String query = ''}) {
+    final needle = query.trim().toLowerCase();
+    final byOrg = <int, List<Officer>>{};
+    for (final officer in _assignableOfficers(app)) {
+      if (needle.isNotEmpty) {
+        final haystack = '${officer.name} ${officer.position} ${officer.section}'.toLowerCase();
+        if (!haystack.contains(needle)) continue;
+      }
+      byOrg.putIfAbsent(officer.organizationId, () => []).add(officer);
+    }
+
+    final groups = app.organizations.organizations
+        .where((org) => org.id != classRosterOrganizationId)
+        .map((org) {
+          final officers = <Officer>[...(byOrg[org.id] ?? [])]
+            ..sort((a, b) => a.name.compareTo(b.name));
+          return _AssignOrgGroup(org: org, officers: officers);
+        })
+        .toList();
+
+    if (needle.isNotEmpty) {
+      return groups.where((group) => group.officers.isNotEmpty).toList();
+    }
+    return groups;
+  }
+
+  void _syncOfficerSelection(AppState app) {
+    final valid = _assignableOfficers(app).map((officer) => officer.id).toSet();
+    _selectedOfficerIds.removeWhere((id) => !valid.contains(id));
+  }
+
+  void _toggleOrgOfficers(_AssignOrgGroup group, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedOfficerIds.addAll(group.officers.map((officer) => officer.id));
+      } else {
+        _selectedOfficerIds.removeAll(group.officers.map((officer) => officer.id));
+      }
+    });
+  }
+
+  Widget _buildOfficerAssign(AppState app) {
+    _syncOfficerSelection(app);
+    final assignable = _assignableOfficers(app);
+    final groups = _assignOrgGroups(app, query: _officerSearchController.text);
+    final selectedOfficers = assignable
+        .where((officer) => _selectedOfficerIds.contains(officer.id))
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        RadioListTile<bool>(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Select all officers', style: TextStyle(color: Colors.white)),
+          value: true,
+          groupValue: _assignAll,
+          activeColor: AppTheme.red,
+          onChanged: (value) => setState(() => _assignAll = value ?? true),
+        ),
+        RadioListTile<bool>(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Choose officers only', style: TextStyle(color: Colors.white)),
+          value: false,
+          groupValue: _assignAll,
+          activeColor: AppTheme.red,
+          onChanged: (value) => setState(() => _assignAll = value ?? false),
+        ),
+        if (_assignAll)
+          Text(
+            'All officers from every organization will be assigned (${assignable.length}).',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12, height: 1.4),
+          )
+        else ...[
+          Text(
+            '${selectedOfficers.length} of ${assignable.length} officers selected',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12),
+          ),
+          if (selectedOfficers.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                ...selectedOfficers.take(8).map((officer) {
+                  final orgName = app.organizations.getById(officer.organizationId)?.name ?? '';
+                  return Chip(
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: AppTheme.red.withValues(alpha: 0.18),
+                    side: BorderSide(color: AppTheme.red.withValues(alpha: 0.35)),
+                    label: Text(
+                      orgName.isEmpty ? officer.name : '${officer.name} · $orgName',
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  );
+                }),
+                if (selectedOfficers.length > 8)
+                  Chip(
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.16)),
+                    label: Text(
+                      '+${selectedOfficers.length - 8} more',
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 10),
+          TextField(
+            controller: _officerSearchController,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search officers by name or position',
+              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+              prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.6)),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.08),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppTheme.red),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (groups.isEmpty)
+            Text(
+              'No matching officers found.',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+            )
+          else
+            ...groups.map((group) => _buildOrgAssignCard(group)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildOrgAssignCard(_AssignOrgGroup group) {
+    final expanded = _expandedOrgId == group.org.id;
+    final selectedCount = group.officers.where((officer) => _selectedOfficerIds.contains(officer.id)).length;
+    final allSelected = group.officers.isNotEmpty && selectedCount == group.officers.length;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _expandedOrgId = _expandedOrgId == group.org.id ? null : group.org.id;
+              });
+            },
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+              child: Row(
+                children: [
+                  Icon(
+                    expanded ? Icons.expand_more : Icons.chevron_right,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      group.org.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Text(
+                    '$selectedCount/${group.officers.length}',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'All',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
+                  ),
+                  const SizedBox(width: 8),
+                  Checkbox(
+                    value: group.officers.isEmpty ? false : (allSelected ? true : (selectedCount > 0 ? null : false)),
+                    tristate: true,
+                    activeColor: AppTheme.red,
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+                    onChanged: group.officers.isEmpty
+                        ? null
+                        : (value) => _toggleOrgOfficers(group, value == true),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded) ...[
+            Divider(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+            if (group.officers.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'No officers in this organization yet.',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
+                  ),
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 180),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(bottom: 6),
+                  itemCount: group.officers.length,
+                  itemBuilder: (context, index) {
+                    final officer = group.officers[index];
+                    final checked = _selectedOfficerIds.contains(officer.id);
+                    return CheckboxListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      title: Text(officer.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                      subtitle: Text(
+                        officer.position,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
+                      ),
+                      value: checked,
+                      activeColor: AppTheme.red,
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedOfficerIds.add(officer.id);
+                          } else {
+                            _selectedOfficerIds.remove(officer.id);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   EventPublishPayload _buildPayload() {
     return EventPublishPayload(
       title: _titleController.text,
@@ -148,7 +425,7 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
       where: _whereController.text,
       eventScope: _eventScope,
       assignAll: _assignAll,
-      assignedOfficerIds: _selectedOfficerIds.toList(),
+      assignedOfficerIds: _assignAll ? const [] : _selectedOfficerIds.toList(),
       imageUrl: _imageUrl,
       expireQrWhenEventDone: _expireQrWhenEventDone,
       timeInWindowStart: _timeLabel(_timeInWindowStart),
@@ -279,6 +556,7 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
   @override
   Widget build(BuildContext context) {
     final layout = context.layout;
+    final app = context.watch<AppState>();
 
     if (!_initialized) {
       return const Scaffold(
@@ -386,34 +664,9 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
                 ),
                 const SizedBox(height: 16),
                 _FieldLabel('Assign officers'),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Select all officers', style: TextStyle(color: Colors.white)),
-                  value: _assignAll,
-                  activeColor: AppTheme.red,
-                  onChanged: (value) => setState(() => _assignAll = value),
-                ),
-                if (!_assignAll)
-                  ...defaultEventOfficers.map(
-                    (officer) => CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(officer.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                      subtitle: Text('Officer #${officer.id}', style: TextStyle(color: Colors.white.withValues(alpha: 0.55))),
-                      value: _selectedOfficerIds.contains(officer.id),
-                      activeColor: AppTheme.red,
-                      onChanged: (checked) {
-                        setState(() {
-                          if (checked == true) {
-                            _selectedOfficerIds.add(officer.id);
-                          } else {
-                            _selectedOfficerIds.remove(officer.id);
-                          }
-                        });
-                      },
-                    ),
-                  ),
+                _buildOfficerAssign(app),
                 const SizedBox(height: 8),
-                SwitchListTile.adaptive(
+                SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Expire QR when event is done', style: TextStyle(color: Colors.white)),
                   subtitle: Text(
@@ -421,13 +674,14 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
                   ),
                   value: _expireQrWhenEventDone,
-                  activeColor: AppTheme.red,
+                  activeThumbColor: AppTheme.red,
                   onChanged: (value) => setState(() => _expireQrWhenEventDone = value),
                 ),
                 const SizedBox(height: 8),
                 _FieldLabel('Time-in window (optional)'),
                 Text(
-                  'Time in is only allowed between start and end on the event date.',
+                  'Time in opens at the start time. Timing in up to the end time is marked '
+                  'Present; after that time in is still allowed but marked Late.',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12),
                 ),
                 const SizedBox(height: 8),
@@ -522,6 +776,13 @@ class _EventPublishScreenState extends State<EventPublishScreen> {
       ),
     );
   }
+}
+
+class _AssignOrgGroup {
+  const _AssignOrgGroup({required this.org, required this.officers});
+
+  final Organization org;
+  final List<Officer> officers;
 }
 
 class _ScopeSelector extends StatelessWidget {

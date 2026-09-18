@@ -1,5 +1,4 @@
 import '../models/trackit_role.dart';
-import 'module_flags.dart';
 
 /// Mobile modules — mirrors `src/app/config/role-access.config.ts` (student & officer only).
 enum AccessModule {
@@ -13,7 +12,6 @@ enum AccessModule {
   accounts,
   outstanding,
   messages,
-  voting,
   reports,
   activityLog,
   profile,
@@ -26,7 +24,6 @@ abstract final class RoleAccess {
     AccessModule.events,
     AccessModule.organizations,
     AccessModule.outstanding,
-    AccessModule.voting,
     AccessModule.profile,
     AccessModule.settings,
   };
@@ -38,7 +35,6 @@ abstract final class RoleAccess {
     AccessModule.messages,
     AccessModule.reports,
     AccessModule.outstanding,
-    AccessModule.voting,
     AccessModule.settings,
   };
 
@@ -54,9 +50,6 @@ abstract final class RoleAccess {
   }
 
   static bool canAccess(TrackitRole role, AccessModule module) {
-    if (module == AccessModule.voting && !ModuleFlags.votingEnabled) {
-      return false;
-    }
     return modulesFor(role).contains(module);
   }
 

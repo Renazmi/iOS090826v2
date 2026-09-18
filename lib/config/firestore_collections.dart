@@ -12,6 +12,7 @@ class FirestoreCollections {
   static const officers = 'officers';
   static const organizations = 'organizations';
   static const previousOfficers = 'previousOfficers';
+  static const adminAccounts = 'adminAccounts';
 }
 
 const eliteChatMembersDocId = 'elite';

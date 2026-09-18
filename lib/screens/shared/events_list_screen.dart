@@ -7,6 +7,7 @@ import '../../config/app_theme.dart';
 import '../../data/seed_data.dart';
 import '../../models/event_item.dart';
 import '../../services/app_state.dart';
+import '../../utils/attendance_punctuality.dart';
 import '../../utils/open_attendance_check_in.dart';
 import '../../widgets/common/trackit_event_tile.dart';
 import '../../widgets/common/trackit_page_layout.dart';
@@ -311,7 +312,9 @@ class _EventsListScreenState extends State<EventsListScreen> {
   String? _myTimedInLabel(AppState app, EventItem event) {
     final record = _myRecord(app, event);
     if (record == null) return null;
-    return _formatAttendanceTime(record.timedInAt);
+    final status =
+        record.punctualityStatus ?? resolvePunctualityStatus(event, record.timedInAt);
+    return '${_formatAttendanceTime(record.timedInAt)} · ${punctualityLabel(status)}';
   }
 
   String? _myTimedOutLabel(AppState app, EventItem event) {
@@ -320,20 +323,31 @@ class _EventsListScreenState extends State<EventsListScreen> {
     return _formatAttendanceTime(record!.timedOutAt!);
   }
 
-  ({int timedInAt, int? timedOutAt})? _myRecord(AppState app, EventItem event) {
+  ({int timedInAt, int? timedOutAt, PunctualityStatus? punctualityStatus})? _myRecord(
+    AppState app,
+    EventItem event,
+  ) {
     if (app.roles.isStudent) {
       final studentId = app.auth.currentStudent?.studentId;
       if (studentId == null) return null;
       final record = app.attendance.getStudentRecord(event.id, studentId);
       if (record == null) return null;
-      return (timedInAt: record.timedInAt, timedOutAt: record.timedOutAt);
+      return (
+        timedInAt: record.timedInAt,
+        timedOutAt: record.timedOutAt,
+        punctualityStatus: record.punctualityStatus,
+      );
     }
     if (app.roles.isOfficer) {
       final officerId = app.auth.currentOfficer?.id;
       if (officerId == null) return null;
       final record = app.attendance.getOfficerRecord(event.id, officerId);
       if (record == null) return null;
-      return (timedInAt: record.timedInAt, timedOutAt: record.timedOutAt);
+      return (
+        timedInAt: record.timedInAt,
+        timedOutAt: record.timedOutAt,
+        punctualityStatus: record.punctualityStatus,
+      );
     }
     return null;
   }
